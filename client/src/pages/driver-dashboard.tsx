@@ -47,6 +47,10 @@ export default function DriverDashboard() {
     enabled: !!user && (user as any)?.role === 'driver',
   });
 
+  // Type assertions for data
+  const typedOrders = orders as Order[];
+  const typedAuctions = auctions as Auction[];
+
   // Mutations
   const markCompletedMutation = useMutation({
     mutationFn: async (orderId: string) => {
@@ -142,8 +146,8 @@ export default function DriverDashboard() {
     return null;
   }
 
-  const assignedOrders = orders.filter((order: Order) => order.status === 'assigned' || order.status === 'in_progress');
-  const completedOrders = orders.filter((order: Order) => order.status === 'completed');
+  const assignedOrders = typedOrders.filter((order: Order) => order.status === 'assigned' || order.status === 'in_progress');
+  const completedOrders = typedOrders.filter((order: Order) => order.status === 'completed');
   const monthlyEarnings = completedOrders.reduce((sum: number, order: Order) => sum + Number(order.price), 0);
 
   const stats = {
@@ -319,17 +323,17 @@ export default function DriverDashboard() {
               <div className="col-span-full flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
               </div>
-            ) : auctions.length === 0 ? (
+            ) : typedAuctions.length === 0 ? (
               <div className="col-span-full text-center py-8 text-gray-500">
                 Keine Auktionen verfügbar
               </div>
             ) : (
-              auctions.map((auction: Auction) => (
+              typedAuctions.map((auction: Auction) => (
                 <AuctionCard
                   key={auction.id}
                   auction={auction}
-                  onPurchase={() => purchaseAuctionMutation.mutate(auction.id)}
-                  isPurchasing={purchaseAuctionMutation.isPending}
+                  onPurchase={() => handlePurchaseClick(auction)}
+                  isPurchasing={false}
                 />
               ))
             )}
@@ -351,12 +355,12 @@ export default function DriverDashboard() {
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
           </div>
-        ) : orders.length === 0 ? (
+        ) : typedOrders.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             Keine Aufträge vorhanden
           </div>
         ) : (
-          orders.map((order: Order) => (
+          typedOrders.map((order: Order) => (
             <Card key={order.id}>
               <CardContent className="pt-6">
                 <div className="flex justify-between items-start mb-3">
@@ -407,12 +411,12 @@ export default function DriverDashboard() {
           <div className="col-span-full flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
           </div>
-        ) : auctions.length === 0 ? (
+        ) : typedAuctions.length === 0 ? (
           <div className="col-span-full text-center py-8 text-gray-500">
             Keine Auktionen verfügbar
           </div>
         ) : (
-          auctions.map((auction: Auction) => (
+          typedAuctions.map((auction: Auction) => (
             <AuctionCard
               key={auction.id}
               auction={auction}
@@ -430,7 +434,7 @@ export default function DriverDashboard() {
       <Navigation 
         user={user}
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onViewChange={(view: string) => setCurrentView(view as ViewType)}
         userType="driver"
       />
       

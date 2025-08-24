@@ -2,11 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 
 interface AuthUser {
   id: string;
-  email: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl: string | null;
+  password: string | null;
+  isLocalUser: string | null;
   role: 'admin' | 'driver';
   status: 'pending' | 'active' | 'inactive';
-  firstName?: string;
-  lastName?: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
 }
 
 export function useAuth() {
