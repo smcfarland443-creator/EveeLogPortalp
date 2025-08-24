@@ -33,16 +33,19 @@ export const userRoleEnum = pgEnum('user_role', ['admin', 'driver']);
 export const userStatusEnum = pgEnum('user_status', ['pending', 'active', 'inactive']);
 
 // Order status enum
-export const orderStatusEnum = pgEnum('order_status', ['open', 'assigned', 'in_progress', 'completed', 'cancelled']);
+export const orderStatusEnum = pgEnum('order_status', ['open', 'assigned', 'pickup_scheduled', 'picked_up', 'delivered', 'completed', 'cancelled']);
 
 // Auction status enum
 export const auctionStatusEnum = pgEnum('auction_status', ['active', 'sold', 'cancelled']);
 
 // Billing status enum
-export const billingStatusEnum = pgEnum('billing_status', ['pending', 'paid', 'cancelled']);
+export const billingStatusEnum = pgEnum('billing_status', ['pending', 'approved', 'rejected', 'paid', 'cancelled']);
 
 // Billing type enum
-export const billingTypeEnum = pgEnum('billing_type', ['order_payment', 'cancellation_fee', 'credit', 'debit']);
+export const billingTypeEnum = pgEnum('billing_type', ['order_payment', 'cancellation_fee', 'credit', 'debit', 'completion_payment']);
+
+// Approval status enum
+export const approvalStatusEnum = pgEnum('approval_status', ['pending', 'approved', 'rejected']);
 
 // Users table
 export const users = pgTable("users", {
@@ -150,10 +153,48 @@ export const billings = pgTable("billings", {
   orderId: varchar("order_id").references(() => orders.id), // Related order if applicable
   auctionId: varchar("auction_id").references(() => auctions.id), // Related auction if applicable
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  type: billingTypeEnum("type").notNull(), // order_payment, cancellation_fee, credit, debit
+  originalAmount: decimal("original_amount", { precision: 10, scale: 2 }), // Original price before admin adjustment
+  type: billingTypeEnum("type").notNull(), // order_payment, cancellation_fee, credit, debit, completion_payment
   status: billingStatusEnum("status").notNull().default('pending'),
   description: text("description").notNull(),
+  adminNotes: text("admin_notes"), // Admin reason for rejection/adjustment
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
   createdById: varchar("created_by_id").notNull().references(() => users.id), // Who created this billing entry
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Vehicle handover protocol table
+export const vehicleHandovers = pgTable("vehicle_handovers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  driverId: varchar("driver_id").notNull().references(() => users.id),
+  handoverType: varchar("handover_type").notNull(), // 'pickup' or 'delivery'
+  kmReading: integer("km_reading"),
+  fuelLevel: varchar("fuel_level"), // e.g., "75%", "1/2", "Full"
+  vehicleCondition: text("vehicle_condition"),
+  damageNotes: text("damage_notes"),
+  photos: text("photos").array(), // Array of photo URLs
+  signature: text("signature"), // Base64 signature or URL
+  location: varchar("location"),
+  handoverDateTime: timestamp("handover_datetime").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Order approval requests (for assignments and auction confirmations)
+export const orderApprovals = pgTable("order_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  driverId: varchar("driver_id").notNull().references(() => users.id),
+  requestType: varchar("request_type").notNull(), // 'assignment', 'auction_purchase', 'price_adjustment'
+  originalAmount: decimal("original_amount", { precision: 10, scale: 2 }),
+  adjustedAmount: decimal("adjusted_amount", { precision: 10, scale: 2 }),
+  status: approvalStatusEnum("status").notNull().default('pending'),
+  driverResponse: text("driver_response"),
+  adminNotes: text("admin_notes"),
+  expiresAt: timestamp("expires_at"), // Auto-expire after 24h
+  respondedAt: timestamp("responded_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -174,6 +215,34 @@ export const billingsRelations = relations(billings, ({ one }) => ({
   }),
   createdBy: one(users, {
     fields: [billings.createdById],
+    references: [users.id],
+  }),
+  approvedBy: one(users, {
+    fields: [billings.approvedBy],
+    references: [users.id],
+  }),
+}));
+
+// Relations for vehicle handovers
+export const vehicleHandoversRelations = relations(vehicleHandovers, ({ one }) => ({
+  order: one(orders, {
+    fields: [vehicleHandovers.orderId],
+    references: [orders.id],
+  }),
+  driver: one(users, {
+    fields: [vehicleHandovers.driverId],
+    references: [users.id],
+  }),
+}));
+
+// Relations for order approvals
+export const orderApprovalsRelations = relations(orderApprovals, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderApprovals.orderId],
+    references: [orders.id],
+  }),
+  driver: one(users, {
+    fields: [orderApprovals.driverId],
     references: [users.id],
   }),
 }));
@@ -232,6 +301,20 @@ export const insertBillingSchema = createInsertSchema(billings).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  approvedBy: true,
+  approvedAt: true,
+});
+
+export const insertVehicleHandoverSchema = createInsertSchema(vehicleHandovers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertOrderApprovalSchema = createInsertSchema(orderApprovals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  respondedAt: true,
 });
 
 // Types
@@ -244,3 +327,7 @@ export type Auction = typeof auctions.$inferSelect;
 export type InsertAuction = z.infer<typeof insertAuctionSchema>;
 export type Billing = typeof billings.$inferSelect;
 export type InsertBilling = z.infer<typeof insertBillingSchema>;
+export type VehicleHandover = typeof vehicleHandovers.$inferSelect;
+export type InsertVehicleHandover = z.infer<typeof insertVehicleHandoverSchema>;
+export type OrderApproval = typeof orderApprovals.$inferSelect;
+export type InsertOrderApproval = z.infer<typeof insertOrderApprovalSchema>;

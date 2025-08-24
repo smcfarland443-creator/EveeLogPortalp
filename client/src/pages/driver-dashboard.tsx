@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AuctionCard } from "@/components/driver/auction-card";
 import { AuctionPurchaseDialog } from "@/components/driver/auction-purchase-dialog";
+import { VehicleHandoverDialog } from "@/components/driver/vehicle-handover-dialog";
 import type { Order, Auction } from "@shared/schema";
 
 type ViewType = 'dashboard' | 'orders' | 'auctions' | 'history';
@@ -18,6 +19,9 @@ export default function DriverDashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isHandoverDialogOpen, setIsHandoverDialogOpen] = useState(false);
+  const [handoverMode, setHandoverMode] = useState<'pickup' | 'delivery'>('pickup');
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
 
@@ -86,6 +90,17 @@ export default function DriverDashboard() {
     setIsPurchaseDialogOpen(false);
   };
 
+  const handleHandoverClick = (order: Order, mode: 'pickup' | 'delivery') => {
+    setSelectedOrder(order);
+    setHandoverMode(mode);
+    setIsHandoverDialogOpen(true);
+  };
+
+  const handleCloseHandoverDialog = () => {
+    setSelectedOrder(null);
+    setIsHandoverDialogOpen(false);
+  };
+
   const acceptOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
       await apiRequest("PATCH", `/api/orders/${orderId}/accept`);
@@ -146,7 +161,12 @@ export default function DriverDashboard() {
     return null;
   }
 
-  const assignedOrders = typedOrders.filter((order: Order) => order.status === 'assigned' || order.status === 'in_progress');
+  const assignedOrders = typedOrders.filter((order: Order) => 
+    order.status === 'assigned' || 
+    order.status === 'in_progress' || 
+    order.status === 'pickup_scheduled' || 
+    order.status === 'picked_up'
+  );
   const completedOrders = typedOrders.filter((order: Order) => order.status === 'completed');
   const monthlyEarnings = completedOrders.reduce((sum: number, order: Order) => sum + Number(order.price), 0);
 
@@ -160,6 +180,9 @@ export default function DriverDashboard() {
     const statusMap = {
       assigned: { label: "Zugewiesen", variant: "default" as const },
       in_progress: { label: "In Bearbeitung", variant: "secondary" as const },
+      pickup_scheduled: { label: "Abholung geplant", variant: "default" as const },
+      picked_up: { label: "Abgeholt", variant: "secondary" as const },
+      delivered: { label: "Ausgeliefert", variant: "secondary" as const },
       completed: { label: "Abgeschlossen", variant: "secondary" as const },
     };
     
@@ -299,6 +322,26 @@ export default function DriverDashboard() {
                         data-testid={`button-mark-completed-${order.id}`}
                       >
                         Als erledigt markieren
+                      </Button>
+                    )}
+                    {order.status === 'pickup_scheduled' && (
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => handleHandoverClick(order, 'pickup')}
+                        data-testid={`button-pickup-handover-${order.id}`}
+                      >
+                        Fahrzeug übernehmen
+                      </Button>
+                    )}
+                    {order.status === 'picked_up' && (
+                      <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => handleHandoverClick(order, 'delivery')}
+                        data-testid={`button-delivery-handover-${order.id}`}
+                      >
+                        Auslieferung dokumentieren
                       </Button>
                     )}
                   </div>
@@ -496,6 +539,14 @@ export default function DriverDashboard() {
         auction={selectedAuction}
         isOpen={isPurchaseDialogOpen}
         onClose={handleClosePurchaseDialog}
+      />
+      
+      {/* Vehicle Handover Dialog */}
+      <VehicleHandoverDialog
+        isOpen={isHandoverDialogOpen}
+        onClose={handleCloseHandoverDialog}
+        order={selectedOrder}
+        mode={handoverMode}
       />
     </div>
   );

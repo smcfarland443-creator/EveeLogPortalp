@@ -334,7 +334,7 @@ export class DatabaseStorage implements IStorage {
     orderId?: string; 
     auctionId?: string; 
     amount: string; 
-    type: 'order_payment' | 'cancellation_fee' | 'credit' | 'debit'; 
+    type: 'order_payment' | 'cancellation_fee' | 'credit' | 'debit' | 'completion_payment'; 
     description: string; 
     createdById: string 
   }): Promise<Billing> {
@@ -351,6 +351,127 @@ export class DatabaseStorage implements IStorage {
 
   async getAllBillings(): Promise<Billing[]> {
     return await db.select().from(billings).orderBy(desc(billings.createdAt));
+  }
+
+  // Get completed orders pending billing approval  
+  async getCompletedOrdersForBilling(): Promise<Order[]> {
+    const completedOrders = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.status, 'completed'));
+
+    // Filter out orders that already have billing entries
+    const ordersWithoutBilling: Order[] = [];
+    for (const order of completedOrders) {
+      const existingBilling = await db
+        .select()
+        .from(billings)
+        .where(
+          and(
+            eq(billings.orderId, order.id),
+            eq(billings.type, 'completion_payment')
+          )
+        );
+      
+      if (existingBilling.length === 0) {
+        ordersWithoutBilling.push(order);
+      }
+    }
+
+    return ordersWithoutBilling;
+  }
+
+  // Create billing for completed order
+  async createCompletionBilling(orderId: string, driverId: string, amount: string, createdById: string): Promise<Billing> {
+    return await this.createBilling({
+      userId: driverId,
+      orderId: orderId,
+      amount: amount,
+      type: 'completion_payment',
+      description: `Vergütung für abgeschlossenen Auftrag`,
+      createdById: createdById,
+    });
+  }
+
+  // Get pending billing approvals (for admin)
+  async getPendingBillingApprovals(): Promise<Billing[]> {
+    return await db
+      .select()
+      .from(billings)
+      .where(eq(billings.status, 'pending'))
+      .orderBy(desc(billings.createdAt));
+  }
+
+  // Update billing status and amount
+  async updateBillingStatus(
+    billingId: string, 
+    status: 'pending' | 'approved' | 'rejected' | 'paid' | 'cancelled',
+    adminNotes?: string,
+    newAmount?: string
+  ): Promise<Billing> {
+    const updateData: any = {
+      status: status,
+      updatedAt: new Date(),
+    };
+
+    if (adminNotes) {
+      updateData.adminNotes = adminNotes;
+    }
+    
+    if (newAmount && newAmount !== '') {
+      updateData.amount = newAmount;
+    }
+
+    const [billing] = await db
+      .update(billings)
+      .set(updateData)
+      .where(eq(billings.id, billingId))
+      .returning();
+    return billing;
+  }
+
+  // Vehicle handover operations
+  async createVehicleHandover(handoverData: {
+    orderId: string;
+    type: 'pickup' | 'delivery';
+    kmReading: string;
+    condition: 'excellent' | 'good' | 'fair' | 'poor';
+    damageNotes?: string;
+    notes?: string;
+    driverId: string;
+  }): Promise<any> {
+    // For now, store in a simple structure until we implement the full schema
+    const handover = {
+      id: crypto.randomUUID(),
+      orderId: handoverData.orderId,
+      type: handoverData.type,
+      kmReading: handoverData.kmReading,
+      condition: handoverData.condition,
+      damageNotes: handoverData.damageNotes || '',
+      notes: handoverData.notes || '',
+      driverId: handoverData.driverId,
+      createdAt: new Date(),
+    };
+
+    // In a real implementation, this would insert into the vehicleHandovers table
+    // For now, we'll simulate success
+    return handover;
+  }
+
+  // Update order status after handover
+  async updateOrderAfterHandover(orderId: string, type: 'pickup' | 'delivery'): Promise<Order | undefined> {
+    const newStatus = type === 'pickup' ? 'picked_up' : 'delivered';
+    
+    const [order] = await db
+      .update(orders)
+      .set({ 
+        status: newStatus,
+        updatedAt: new Date() 
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+    
+    return order;
   }
 }
 

@@ -13,9 +13,10 @@ import { OrderFormModal } from "@/components/admin/order-form-modal";
 import { OrderEditModal } from "@/components/admin/order-edit-modal";
 import { AuctionFormModal } from "@/components/admin/auction-form-modal";
 import { UserFormModal } from "@/components/admin/user-form-modal";
+import AdminBilling from "@/pages/admin-billing";
 import type { User, Order, Auction } from "@shared/schema";
 
-type ViewType = 'dashboard' | 'orders' | 'auctions' | 'users' | 'reports';
+type ViewType = 'dashboard' | 'orders' | 'auctions' | 'users' | 'billing' | 'reports';
 
 export default function AdminDashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -160,8 +161,8 @@ export default function AdminDashboard() {
   }
 
   const stats = {
-    activeOrders: orders.filter((order: Order) => order.status === 'assigned' || order.status === 'in_progress').length,
-    completedTrips: orders.filter((order: Order) => order.status === 'completed').length,
+    activeOrders: orders.filter((order: Order) => order.status === 'pickup_scheduled' || order.status === 'picked_up').length,
+    completedTrips: orders.filter((order: Order) => order.status === 'completed' || order.status === 'delivered').length,
     activeDrivers: users.filter((user: User) => user.role === 'driver' && user.status === 'active').length,
     openAuctions: auctions.filter((auction: Auction) => auction.status === 'active').length,
   };
@@ -169,8 +170,9 @@ export default function AdminDashboard() {
   const getStatusBadge = (status: string) => {
     const statusMap = {
       open: { label: "Offen", variant: "outline" as const },
-      assigned: { label: "Zugewiesen", variant: "default" as const },
-      in_progress: { label: "In Bearbeitung", variant: "secondary" as const },
+      pickup_scheduled: { label: "Abholung geplant", variant: "default" as const },
+      picked_up: { label: "Abgeholt", variant: "secondary" as const },
+      delivered: { label: "Ausgeliefert", variant: "secondary" as const },
       completed: { label: "Abgeschlossen", variant: "secondary" as const },
       cancelled: { label: "Storniert", variant: "destructive" as const },
       active: { label: "Aktiv", variant: "default" as const },
@@ -613,6 +615,19 @@ export default function AdminDashboard() {
                 <i className="fas fa-users mr-3"></i>
                 Benutzer verwalten
               </button>
+
+              <button
+                onClick={() => setCurrentView('billing')}
+                className={`w-full text-left group flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
+                  currentView === 'billing'
+                    ? 'bg-primary-50 text-primary-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+                data-testid="nav-billing"
+              >
+                <i className="fas fa-euro-sign mr-3"></i>
+                Abrechnungen
+              </button>
             </div>
           </nav>
         </div>
@@ -622,6 +637,7 @@ export default function AdminDashboard() {
           {currentView === 'orders' && renderOrdersContent()}
           {currentView === 'auctions' && renderAuctionsContent()}
           {currentView === 'users' && renderUsersContent()}
+          {currentView === 'billing' && <AdminBilling />}
         </div>
       </div>
 

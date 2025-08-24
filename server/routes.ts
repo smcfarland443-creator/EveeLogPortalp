@@ -410,6 +410,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get completed orders pending billing approval (admin only)
+  app.get('/api/admin/billing/pending', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const pendingOrders = await storage.getCompletedOrdersForBilling();
+      res.json(pendingOrders);
+    } catch (error) {
+      console.error("Error fetching pending billing orders:", error);
+      res.status(500).json({ message: "Failed to fetch pending billing orders" });
+    }
+  });
+
+  // Create billing for completed order (admin only)
+  app.post('/api/admin/billing/create', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { orderId, driverId, amount } = req.body;
+      
+      if (!orderId || !driverId || !amount) {
+        return res.status(400).json({ message: "orderId, driverId, and amount are required" });
+      }
+
+      const billing = await storage.createCompletionBilling(
+        orderId, 
+        driverId, 
+        amount, 
+        req.user.claims.sub
+      );
+      
+      res.json(billing);
+    } catch (error) {
+      console.error("Error creating billing:", error);
+      res.status(500).json({ message: "Failed to create billing" });
+    }
+  });
+
+  // Get pending billing approvals (admin only)
+  app.get('/api/admin/billing/approvals', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const pendingBillings = await storage.getPendingBillingApprovals();
+      res.json(pendingBillings);
+    } catch (error) {
+      console.error("Error fetching pending billing approvals:", error);
+      res.status(500).json({ message: "Failed to fetch pending billing approvals" });
+    }
+  });
+
+  // Approve or reject billing (admin only)
+  app.patch('/api/admin/billing/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { status, adminNotes, newAmount } = req.body;
+      const billingId = req.params.id;
+      
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: "Status must be 'approved' or 'rejected'" });
+      }
+
+      const billing = await storage.updateBillingStatus(billingId, status, adminNotes, newAmount);
+      res.json(billing);
+    } catch (error) {
+      console.error("Error updating billing status:", error);
+      res.status(500).json({ message: "Failed to update billing status" });
+    }
+  });
+
+  // Vehicle handover routes
+  app.post('/api/orders/:id/handover', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'driver') {
+        return res.status(403).json({ message: "Only drivers can submit handover documentation" });
+      }
+
+      const orderId = req.params.id;
+      const { type, pickupKm, deliveryKm, condition, damageNotes, pickupNotes, deliveryNotes } = req.body;
+
+      // Create handover record
+      const handover = await storage.createVehicleHandover({
+        orderId,
+        type,
+        kmReading: type === 'pickup' ? pickupKm : deliveryKm,
+        condition,
+        damageNotes,
+        notes: type === 'pickup' ? pickupNotes : deliveryNotes,
+        driverId: req.user.claims.sub,
+      });
+
+      // Update order status
+      const updatedOrder = await storage.updateOrderAfterHandover(orderId, type);
+
+      res.json({ handover, order: updatedOrder });
+    } catch (error) {
+      console.error("Error creating vehicle handover:", error);
+      res.status(500).json({ message: "Failed to create vehicle handover" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
