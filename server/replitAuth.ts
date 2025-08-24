@@ -1,11 +1,13 @@
 import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
+import { Strategy as LocalStrategy } from "passport-local";
 
 import passport from "passport";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
+import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 
 if (!process.env.REPLIT_DOMAINS) {
@@ -72,6 +74,52 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Local Strategy für admin-erstellte Benutzer
+  passport.use(new LocalStrategy(
+    { usernameField: 'email' },
+    async (email, password, done) => {
+      try {
+        // Find user by email where isLocalUser is true
+        const users = await storage.getUsersByRole('driver');
+        const adminUsers = await storage.getUsersByRole('admin');
+        const allUsers = [...users, ...adminUsers];
+        
+        const user = allUsers.find(u => u.email === email && u.isLocalUser === 'true');
+        
+        if (!user) {
+          return done(null, false, { message: 'Ungültige E-Mail oder Passwort' });
+        }
+
+        if (user.status !== 'active') {
+          return done(null, false, { message: 'Account ist nicht aktiv' });
+        }
+
+        // Verify password
+        const isValidPassword = await bcrypt.compare(password, user.password!);
+        if (!isValidPassword) {
+          return done(null, false, { message: 'Ungültige E-Mail oder Passwort' });
+        }
+
+        // Create session object similar to Replit Auth
+        const sessionUser = {
+          claims: {
+            sub: user.id,
+            email: user.email,
+            first_name: user.firstName,
+            last_name: user.lastName,
+            profile_image_url: user.profileImageUrl,
+          },
+          isLocalUser: true,
+          expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
+        };
+
+        return done(null, sessionUser);
+      } catch (error) {
+        return done(error);
+      }
+    }
+  ));
+
   const config = await getOidcConfig();
 
   const verify: VerifyFunction = async (
@@ -117,13 +165,37 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/logout", (req, res) => {
     req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+      // Check if user was logged in via local auth
+      if ((req.user as any)?.isLocalUser) {
+        res.redirect("/");
+      } else {
+        res.redirect(
+          client.buildEndSessionUrl(config, {
+            client_id: process.env.REPL_ID!,
+            post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+          }).href
+        );
+      }
     });
+  });
+
+  // Local login route
+  app.post("/api/auth/login", (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Interner Serverfehler" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Login fehlgeschlagen" });
+      }
+      
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Interner Serverfehler" });
+        }
+        return res.json({ message: "Login erfolgreich", user: { id: user.claims.sub, email: user.claims.email } });
+      });
+    })(req, res, next);
   });
 }
 
@@ -139,6 +211,17 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return next();
   }
 
+  // If it's a local user, check if session is still valid
+  if (user.isLocalUser) {
+    // Local users don't have refresh tokens, so we just check expiry
+    if (now > user.expires_at) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+    return next();
+  }
+
+  // For Replit Auth users, try to refresh token
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
     res.status(401).json({ message: "Unauthorized" });
