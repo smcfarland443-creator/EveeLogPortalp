@@ -136,6 +136,13 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  pickupDate: z.union([z.string(), z.date()]).transform((val) => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+  deliveryDate: z.union([z.string(), z.date(), z.undefined()]).transform((val) => 
+    val && typeof val === 'string' ? new Date(val) : val
+  ).optional(),
 });
 
 export const insertAuctionSchema = createInsertSchema(auctions).omit({
@@ -144,6 +151,13 @@ export const insertAuctionSchema = createInsertSchema(auctions).omit({
   updatedAt: true,
   purchasedById: true,
   purchasedAt: true,
+}).extend({
+  pickupDate: z.union([z.string(), z.date()]).transform((val) => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+  deliveryDate: z.union([z.string(), z.date(), z.undefined()]).transform((val) => 
+    val && typeof val === 'string' ? new Date(val) : val
+  ).optional(),
 });
 
 // Types
