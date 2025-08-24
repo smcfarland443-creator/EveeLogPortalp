@@ -25,12 +25,15 @@ export interface IStorage {
   
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
+  updateOrder(id: string, orderData: Partial<InsertOrder>): Promise<Order | undefined>;
   getOrders(): Promise<Order[]>;
   getOrdersByDriver(driverId: string): Promise<Order[]>;
   getOrderById(id: string): Promise<Order | undefined>;
   updateOrderStatus(id: string, status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled'): Promise<Order | undefined>;
   assignOrderToDriver(orderId: string, driverId: string): Promise<Order | undefined>;
   deleteOrder(id: string): Promise<boolean>;
+  acceptOrder(orderId: string, driverId: string): Promise<Order | undefined>;
+  rejectOrder(orderId: string, driverId: string): Promise<Order | undefined>;
   
   // Auction operations
   createAuction(auction: InsertAuction): Promise<Auction>;
@@ -87,6 +90,15 @@ export class DatabaseStorage implements IStorage {
     return newOrder;
   }
 
+  async updateOrder(id: string, orderData: Partial<InsertOrder>): Promise<Order | undefined> {
+    const [order] = await db
+      .update(orders)
+      .set({ ...orderData, updatedAt: new Date() })
+      .where(eq(orders.id, id))
+      .returning();
+    return order;
+  }
+
   async getOrders(): Promise<Order[]> {
     return await db.select().from(orders).orderBy(desc(orders.createdAt));
   }
@@ -125,6 +137,24 @@ export class DatabaseStorage implements IStorage {
   async deleteOrder(id: string): Promise<boolean> {
     const result = await db.delete(orders).where(eq(orders.id, id));
     return result.rowCount > 0;
+  }
+
+  async acceptOrder(orderId: string, driverId: string): Promise<Order | undefined> {
+    const [order] = await db
+      .update(orders)
+      .set({ status: 'in_progress', updatedAt: new Date() })
+      .where(and(eq(orders.id, orderId), eq(orders.assignedDriverId, driverId)))
+      .returning();
+    return order;
+  }
+
+  async rejectOrder(orderId: string, driverId: string): Promise<Order | undefined> {
+    const [order] = await db
+      .update(orders)
+      .set({ assignedDriverId: null, status: 'open', updatedAt: new Date() })
+      .where(and(eq(orders.id, orderId), eq(orders.assignedDriverId, driverId)))
+      .returning();
+    return order;
   }
 
   // Auction operations

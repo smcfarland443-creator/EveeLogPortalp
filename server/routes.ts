@@ -46,6 +46,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/drivers/active', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const activeDrivers = await storage.getUsersByStatus('active');
+      const drivers = activeDrivers.filter(user => user.role === 'driver');
+      res.json(drivers);
+    } catch (error) {
+      console.error("Error fetching active drivers:", error);
+      res.status(500).json({ message: "Failed to fetch active drivers" });
+    }
+  });
+
   app.patch('/api/users/:id/status', isAuthenticated, async (req: any, res) => {
     try {
       const currentUser = await storage.getUser(req.user.claims.sub);
@@ -109,6 +125,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/orders/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Manually prepare data with correct date conversion
+      const updateData: any = { ...req.body };
+      if (updateData.pickupDate) {
+        updateData.pickupDate = new Date(updateData.pickupDate);
+      }
+      if (updateData.deliveryDate) {
+        updateData.deliveryDate = new Date(updateData.deliveryDate);
+      }
+
+      const order = await storage.updateOrder(req.params.id, updateData);
+      res.json(order);
+    } catch (error) {
+      console.error("Error updating order:", error);
+      res.status(500).json({ message: "Failed to update order" });
+    }
+  });
+
   app.patch('/api/orders/:id/assign', isAuthenticated, async (req: any, res) => {
     try {
       const currentUser = await storage.getUser(req.user.claims.sub);
@@ -122,6 +162,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error assigning order:", error);
       res.status(500).json({ message: "Failed to assign order" });
+    }
+  });
+
+  app.patch('/api/orders/:id/accept', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'driver') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const order = await storage.acceptOrder(req.params.id, req.user.claims.sub);
+      res.json(order);
+    } catch (error) {
+      console.error("Error accepting order:", error);
+      res.status(500).json({ message: "Failed to accept order" });
+    }
+  });
+
+  app.patch('/api/orders/:id/reject', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'driver') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const order = await storage.rejectOrder(req.params.id, req.user.claims.sub);
+      res.json(order);
+    } catch (error) {
+      console.error("Error rejecting order:", error);
+      res.status(500).json({ message: "Failed to reject order" });
     }
   });
 

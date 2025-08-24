@@ -1,11 +1,11 @@
-import { useState } from "react";
+import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { insertOrderSchema, type User } from "@shared/schema";
+import { insertOrderSchema, type User, type Order } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,20 +14,21 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
 
-const orderFormSchema = insertOrderSchema.extend({
+const orderEditSchema = insertOrderSchema.extend({
   pickupDate: z.string().min(1, "Pickup date is required"),
   deliveryDate: z.string().optional(),
   vehicleYear: z.number().optional(),
 }).omit({ createdById: true });
 
-type OrderFormData = z.infer<typeof orderFormSchema>;
+type OrderEditData = z.infer<typeof orderEditSchema>;
 
-interface OrderFormModalProps {
+interface OrderEditModalProps {
   isOpen: boolean;
   onClose: () => void;
+  order: Order | null;
 }
 
-export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
+export function OrderEditModal({ isOpen, onClose, order }: OrderEditModalProps) {
   const { toast } = useToast();
   
   // Fetch active drivers for assignment
@@ -36,40 +37,41 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
     enabled: isOpen,
   });
   
-  const form = useForm<OrderFormData>({
-    resolver: zodResolver(orderFormSchema),
+  const form = useForm<OrderEditData>({
+    resolver: zodResolver(orderEditSchema),
     defaultValues: {
-      pickupLocation: "",
-      deliveryLocation: "",
-      vehicleBrand: "",
-      vehicleModel: "",
-      vehicleYear: undefined,
-      pickupDate: "",
-      deliveryDate: "",
-      price: "",
-      distance: undefined,
-      notes: "",
-      status: "open",
-      assignedDriverId: undefined,
+      pickupLocation: order?.pickupLocation || "",
+      deliveryLocation: order?.deliveryLocation || "",
+      vehicleBrand: order?.vehicleBrand || "",
+      vehicleModel: order?.vehicleModel || "",
+      vehicleYear: order?.vehicleYear || undefined,
+      pickupDate: order?.pickupDate ? new Date(order.pickupDate).toISOString().split('T')[0] : "",
+      deliveryDate: order?.deliveryDate ? new Date(order.deliveryDate).toISOString().split('T')[0] : "",
+      price: order?.price || "",
+      distance: order?.distance || undefined,
+      notes: order?.notes || "",
+      status: order?.status || "open",
+      assignedDriverId: order?.assignedDriverId || undefined,
     },
   });
 
-  const createOrderMutation = useMutation({
-    mutationFn: async (data: OrderFormData) => {
+  const updateOrderMutation = useMutation({
+    mutationFn: async (data: OrderEditData) => {
+      if (!order) return;
+      
       const orderData = {
         ...data,
-        pickupDate: new Date(data.pickupDate),
-        deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : undefined,
+        pickupDate: data.pickupDate,
+        deliveryDate: data.deliveryDate || null,
         price: data.price.toString(),
       };
       
-      await apiRequest("POST", "/api/orders", orderData);
+      await apiRequest("PATCH", `/api/orders/${order.id}`, orderData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({ title: "Success", description: "Order created successfully" });
+      toast({ title: "Success", description: "Order updated successfully" });
       onClose();
-      form.reset();
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -83,32 +85,56 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
         }, 500);
         return;
       }
-      toast({ 
-        title: "Error", 
-        description: "Failed to create order", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: "Failed to update order. Please try again.",
+        variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: OrderFormData) => {
-    createOrderMutation.mutate(data);
+  const handleSubmit = (data: OrderEditData) => {
+    updateOrderMutation.mutate(data);
   };
 
   const handleClose = () => {
-    onClose();
     form.reset();
+    onClose();
   };
+
+  // Update form values when order changes
+  React.useEffect(() => {
+    if (order && isOpen) {
+      form.reset({
+        pickupLocation: order.pickupLocation,
+        deliveryLocation: order.deliveryLocation,
+        vehicleBrand: order.vehicleBrand,
+        vehicleModel: order.vehicleModel,
+        vehicleYear: order.vehicleYear || undefined,
+        pickupDate: new Date(order.pickupDate).toISOString().split('T')[0],
+        deliveryDate: order.deliveryDate ? new Date(order.deliveryDate).toISOString().split('T')[0] : "",
+        price: order.price,
+        distance: order.distance || undefined,
+        notes: order.notes || "",
+        status: order.status,
+        assignedDriverId: order.assignedDriverId || undefined,
+      });
+    }
+  }, [order, isOpen, form]);
+
+  if (!order) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Neuen Auftrag erstellen</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-gray-900">
+            Auftrag bearbeiten
+          </DialogTitle>
         </DialogHeader>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -118,7 +144,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                     <FormLabel>Abholort</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="Stuttgart" 
+                        placeholder="Berlin, Deutschland" 
                         {...field} 
                         data-testid="input-pickup-location"
                       />
@@ -136,7 +162,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                     <FormLabel>Zielort</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="München" 
+                        placeholder="München, Deutschland" 
                         {...field} 
                         data-testid="input-delivery-location"
                       />
@@ -147,7 +173,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <FormField
                 control={form.control}
                 name="vehicleBrand"
@@ -171,10 +197,10 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                 name="vehicleModel"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Modell</FormLabel>
+                    <FormLabel>Fahrzeugmodell</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="320d" 
+                        placeholder="X3" 
                         {...field} 
                         data-testid="input-vehicle-model"
                       />
@@ -183,19 +209,17 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
               <FormField
                 control={form.control}
                 name="vehicleYear"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Baujahr</FormLabel>
+                    <FormLabel>Baujahr (optional)</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
-                        placeholder="2020" 
+                        placeholder="2023" 
                         {...field}
                         value={field.value || ""}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
@@ -206,17 +230,19 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                   </FormItem>
                 )}
               />
-              
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
                 name="pickupDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Abholtermin</FormLabel>
+                    <FormLabel>Abholdatum</FormLabel>
                     <FormControl>
                       <Input 
                         type="date" 
-                        {...field} 
+                        {...field}
                         data-testid="input-pickup-date"
                       />
                     </FormControl>
@@ -230,7 +256,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                 name="deliveryDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Liefertermin</FormLabel>
+                    <FormLabel>Lieferdatum (optional)</FormLabel>
                     <FormControl>
                       <Input 
                         type="date" 
@@ -313,7 +339,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
               name="assignedDriverId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fahrer zuweisen (optional)</FormLabel>
+                  <FormLabel>Fahrer zuweisen</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
                     value={field.value || ""}
@@ -345,6 +371,44 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-status">
+                        <SelectValue placeholder="Status auswählen" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="open" data-testid="option-status-open">
+                        Offen
+                      </SelectItem>
+                      <SelectItem value="assigned" data-testid="option-status-assigned">
+                        Zugewiesen
+                      </SelectItem>
+                      <SelectItem value="in_progress" data-testid="option-status-in-progress">
+                        In Bearbeitung
+                      </SelectItem>
+                      <SelectItem value="completed" data-testid="option-status-completed">
+                        Abgeschlossen
+                      </SelectItem>
+                      <SelectItem value="cancelled" data-testid="option-status-cancelled">
+                        Storniert
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
               <Button 
                 type="button" 
@@ -357,10 +421,10 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
               <Button 
                 type="submit" 
                 className="bg-primary-500 hover:bg-primary-600 text-white"
-                disabled={createOrderMutation.isPending}
-                data-testid="button-submit"
+                disabled={updateOrderMutation.isPending}
+                data-testid="button-update"
               >
-                {createOrderMutation.isPending ? "Erstelle..." : "Auftrag erstellen"}
+                {updateOrderMutation.isPending ? "Wird aktualisiert..." : "Auftrag aktualisieren"}
               </Button>
             </div>
           </form>

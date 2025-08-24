@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { OrderFormModal } from "@/components/admin/order-form-modal";
+import { OrderEditModal } from "@/components/admin/order-edit-modal";
 import { AuctionFormModal } from "@/components/admin/auction-form-modal";
 import { UserFormModal } from "@/components/admin/user-form-modal";
 import type { User, Order, Auction } from "@shared/schema";
@@ -19,6 +20,8 @@ type ViewType = 'dashboard' | 'orders' | 'auctions' | 'users' | 'reports';
 export default function AdminDashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [showOrderEditModal, setShowOrderEditModal] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [showAuctionModal, setShowAuctionModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const { toast } = useToast();
@@ -132,6 +135,17 @@ export default function AdminDashboard() {
       toast({ title: "Error", description: "Failed to delete auction", variant: "destructive" });
     },
   });
+
+  // Functions
+  const handleEditOrder = (order: Order) => {
+    setEditingOrder(order);
+    setShowOrderEditModal(true);
+  };
+
+  const handleCloseEditOrder = () => {
+    setEditingOrder(null);
+    setShowOrderEditModal(false);
+  };
 
   if (authLoading) {
     return (
@@ -359,6 +373,15 @@ export default function AdminDashboard() {
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-blue-600 hover:text-blue-900"
+                          onClick={() => handleEditOrder(order)}
+                          data-testid={`button-edit-order-${order.id}`}
+                        >
+                          Bearbeiten
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="sm"
@@ -597,6 +620,12 @@ export default function AdminDashboard() {
       <OrderFormModal 
         isOpen={showOrderModal} 
         onClose={() => setShowOrderModal(false)} 
+      />
+      
+      <OrderEditModal 
+        isOpen={showOrderEditModal} 
+        onClose={handleCloseEditOrder}
+        order={editingOrder}
       />
       
       <AuctionFormModal 

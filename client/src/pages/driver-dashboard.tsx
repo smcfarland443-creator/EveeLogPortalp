@@ -95,6 +95,54 @@ export default function DriverDashboard() {
     },
   });
 
+  const acceptOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      await apiRequest("PATCH", `/api/orders/${orderId}/accept`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Success", description: "Order accepted successfully!" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to accept order", variant: "destructive" });
+    },
+  });
+
+  const rejectOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      await apiRequest("PATCH", `/api/orders/${orderId}/reject`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Success", description: "Order rejected successfully" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to reject order", variant: "destructive" });
+    },
+  });
+
   if (authLoading) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
@@ -229,9 +277,32 @@ export default function DriverDashboard() {
                   
                   <div className="flex space-x-3">
                     {order.status === 'assigned' && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="bg-green-500 hover:bg-green-600 text-white"
+                          onClick={() => acceptOrderMutation.mutate(order.id)}
+                          disabled={acceptOrderMutation.isPending}
+                          data-testid={`button-accept-order-${order.id}`}
+                        >
+                          Annehmen
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-600 hover:bg-red-50"
+                          onClick={() => rejectOrderMutation.mutate(order.id)}
+                          disabled={rejectOrderMutation.isPending}
+                          data-testid={`button-reject-order-${order.id}`}
+                        >
+                          Ablehnen
+                        </Button>
+                      </>
+                    )}
+                    {order.status === 'in_progress' && (
                       <Button
                         size="sm"
-                        className="bg-green-500 hover:bg-green-600 text-white"
+                        className="bg-blue-500 hover:bg-blue-600 text-white"
                         onClick={() => markCompletedMutation.mutate(order.id)}
                         disabled={markCompletedMutation.isPending}
                         data-testid={`button-mark-completed-${order.id}`}
