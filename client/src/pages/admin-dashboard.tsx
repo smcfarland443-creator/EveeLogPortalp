@@ -29,7 +29,7 @@ export default function AdminDashboard() {
 
   // Redirect to login if not authenticated
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'admin')) {
+    if (!authLoading && (!user || (user as any).role !== 'admin')) {
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
@@ -43,24 +43,24 @@ export default function AdminDashboard() {
   }, [user, authLoading, toast]);
 
   // Fetch data
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+  const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
-    enabled: !!user && user.role === 'admin',
+    enabled: !!user && (user as any).role === 'admin',
   });
 
-  const { data: auctions = [], isLoading: auctionsLoading } = useQuery({
+  const { data: auctions = [], isLoading: auctionsLoading } = useQuery<Auction[]>({
     queryKey: ["/api/auctions"],
-    enabled: !!user && user.role === 'admin',
+    enabled: !!user && (user as any).role === 'admin',
   });
 
-  const { data: users = [], isLoading: usersLoading } = useQuery({
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: !!user && user.role === 'admin',
+    enabled: !!user && (user as any).role === 'admin',
   });
 
-  const { data: pendingUsers = [] } = useQuery({
+  const { data: pendingUsers = [] } = useQuery<User[]>({
     queryKey: ["/api/users", { status: 'pending' }],
-    enabled: !!user && user.role === 'admin',
+    enabled: !!user && (user as any).role === 'admin',
   });
 
   // Mutations
@@ -155,7 +155,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!user || user.role !== 'admin') {
+  if (!user || (user as any).role !== 'admin') {
     return null;
   }
 
@@ -544,9 +544,9 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-full">
       <Navigation 
-        user={user}
+        user={user as any}
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onViewChange={(view: string) => setCurrentView(view as ViewType)}
         userType="admin"
       />
       
