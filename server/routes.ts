@@ -88,12 +88,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const orderData = insertOrderSchema.parse({
+      // Manually prepare data with correct date conversion
+      const orderInput = {
         ...req.body,
+        pickupDate: req.body.pickupDate ? new Date(req.body.pickupDate) : new Date(),
+        deliveryDate: req.body.deliveryDate ? new Date(req.body.deliveryDate) : null,
         createdById: req.user.claims.sub,
-      });
-      
-      const order = await storage.createOrder(orderData);
+      };
+
+      // Remove any undefined deliveryDate
+      if (!orderInput.deliveryDate) {
+        delete orderInput.deliveryDate;
+      }
+
+      const order = await storage.createOrder(orderInput);
       res.json(order);
     } catch (error) {
       console.error("Error creating order:", error);
@@ -165,12 +173,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const auctionData = insertAuctionSchema.parse({
+      // Manually prepare data with correct date conversion
+      const auctionInput = {
         ...req.body,
+        pickupDate: req.body.pickupDate ? new Date(req.body.pickupDate) : new Date(),
+        deliveryDate: req.body.deliveryDate ? new Date(req.body.deliveryDate) : null,
         createdById: req.user.claims.sub,
-      });
-      
-      const auction = await storage.createAuction(auctionData);
+      };
+
+      // Remove any undefined deliveryDate
+      if (!auctionInput.deliveryDate) {
+        delete auctionInput.deliveryDate;
+      }
+
+      const auction = await storage.createAuction(auctionInput);
       res.json(auction);
     } catch (error) {
       console.error("Error creating auction:", error);
