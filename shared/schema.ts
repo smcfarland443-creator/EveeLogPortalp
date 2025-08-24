@@ -33,7 +33,7 @@ export const userRoleEnum = pgEnum('user_role', ['admin', 'driver', 'disponent']
 export const userStatusEnum = pgEnum('user_status', ['pending', 'active', 'inactive']);
 
 // Order status enum
-export const orderStatusEnum = pgEnum('order_status', ['open', 'assigned', 'pickup_scheduled', 'picked_up', 'delivered', 'completed', 'cancelled']);
+export const orderStatusEnum = pgEnum('order_status', ['open', 'assigned', 'in_progress', 'completed', 'cancelled']);
 
 // Auction status enum
 export const auctionStatusEnum = pgEnum('auction_status', ['active', 'sold', 'cancelled']);
@@ -327,8 +327,6 @@ export type Auction = typeof auctions.$inferSelect;
 export type InsertAuction = z.infer<typeof insertAuctionSchema>;
 export type Billing = typeof billings.$inferSelect;
 export type InsertBilling = z.infer<typeof insertBillingSchema>;
-export type VehicleHandover = typeof vehicleHandovers.$inferSelect;
-export type InsertVehicleHandover = z.infer<typeof insertVehicleHandoverSchema>;
 export type VehicleHandover = typeof vehicleHandovers.$inferSelect;
 export type InsertVehicleHandover = z.infer<typeof insertVehicleHandoverSchema>;
 export type OrderApproval = typeof orderApprovals.$inferSelect;

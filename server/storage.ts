@@ -150,7 +150,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
-    await db.delete(users).where(eq(users.id, id));
+    const result = await db.delete(users).where(eq(users.id, id));
+    if ((result.rowCount || 0) === 0) {
+      throw new Error('User not found');
+    }
   }
 
   async updateUser(id: string, userData: {
@@ -259,7 +262,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteOrder(id: string): Promise<boolean> {
     const result = await db.delete(orders).where(eq(orders.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async acceptOrder(orderId: string, driverId: string): Promise<Order | undefined> {

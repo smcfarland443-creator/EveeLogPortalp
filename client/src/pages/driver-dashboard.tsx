@@ -168,9 +168,7 @@ export default function DriverDashboard() {
 
   const assignedOrders = typedOrders.filter((order: Order) => 
     (order.status === 'assigned' && order.fromAuction !== 'true') || // Manual assignments that need acceptance
-    order.status === 'in_progress' || 
-    order.status === 'pickup_scheduled' || 
-    order.status === 'picked_up'
+    order.status === 'in_progress'
   );
   const completedOrders = typedOrders.filter((order: Order) => order.status === 'completed');
   const monthlyEarnings = completedOrders.reduce((sum: number, order: Order) => sum + Number(order.price), 0);
@@ -185,10 +183,9 @@ export default function DriverDashboard() {
     const statusMap = {
       assigned: { label: "Zugewiesen", variant: "default" as const },
       in_progress: { label: "In Bearbeitung", variant: "secondary" as const },
-      pickup_scheduled: { label: "Abholung geplant", variant: "default" as const },
-      picked_up: { label: "Abgeholt", variant: "secondary" as const },
-      delivered: { label: "Ausgeliefert", variant: "secondary" as const },
       completed: { label: "Abgeschlossen", variant: "secondary" as const },
+      cancelled: { label: "Storniert", variant: "destructive" as const },
+      open: { label: "Offen", variant: "outline" as const },
     };
     
     const config = statusMap[status as keyof typeof statusMap];
@@ -300,11 +297,10 @@ export default function DriverDashboard() {
                         <Button
                           size="sm"
                           className="bg-green-500 hover:bg-green-600 text-white"
-                          onClick={() => acceptOrderMutation.mutate(order.id)}
-                          disabled={acceptOrderMutation.isPending}
-                          data-testid={`button-accept-order-${order.id}`}
+                          onClick={() => handleHandoverClick(order, 'pickup')}
+                          data-testid={`button-start-pickup-${order.id}`}
                         >
-                          Annehmen
+                          Auftrag starten
                         </Button>
                         <Button
                           size="sm"
@@ -329,17 +325,7 @@ export default function DriverDashboard() {
                         Als erledigt markieren
                       </Button>
                     )}
-                    {order.status === 'pickup_scheduled' && (
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => handleHandoverClick(order, 'pickup')}
-                        data-testid={`button-pickup-handover-${order.id}`}
-                      >
-                        Fahrzeug übernehmen
-                      </Button>
-                    )}
-                    {order.status === 'picked_up' && (
+                    {order.status === 'in_progress' && (
                       <Button
                         size="sm"
                         className="bg-blue-600 hover:bg-blue-700 text-white"
