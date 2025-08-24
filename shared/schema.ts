@@ -44,6 +44,8 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  password: varchar("password"), // For admin-created users (hashed)
+  isLocalUser: varchar("is_local_user").default('false'), // 'true' for admin-created users, 'false' for Replit Auth
   role: userRoleEnum("role").notNull().default('driver'),
   status: userStatusEnum("status").notNull().default('pending'),
   createdAt: timestamp("created_at").defaultNow(),
@@ -130,6 +132,17 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  password: true,
+  isLocalUser: true,
+});
+
+export const createLocalUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  isLocalUser: true,
+}).extend({
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({

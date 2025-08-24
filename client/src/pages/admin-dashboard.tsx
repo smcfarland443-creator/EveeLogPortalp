@@ -490,6 +490,14 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold text-gray-900">Benutzer verwalten</h1>
           <p className="text-gray-600">Verwalten Sie Fahrer-Accounts und Berechtigungen</p>
         </div>
+        <Button 
+          onClick={() => setShowUserModal(true)}
+          className="bg-primary-500 hover:bg-primary-600 text-white"
+          data-testid="button-add-user"
+        >
+          <i className="fas fa-plus mr-2"></i>
+          Benutzer hinzufügen
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

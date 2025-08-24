@@ -78,6 +78,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create local user
+  app.post('/api/users/create', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { email, firstName, lastName, password, role, status } = req.body;
+      
+      if (!email || !firstName || !lastName || !password || !role || !status) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const newUser = await storage.createLocalUser({
+        email,
+        firstName,
+        lastName,
+        password,
+        role,
+        status,
+      });
+
+      res.json({ id: newUser.id, message: "User created successfully" });
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      if (error.code === '23505') { // Unique constraint violation
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
   // Order management routes
   app.get('/api/orders', isAuthenticated, async (req: any, res) => {
     try {

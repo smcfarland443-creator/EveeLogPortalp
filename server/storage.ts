@@ -11,6 +11,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 // Interface for storage operations
 export interface IStorage {
@@ -22,6 +23,14 @@ export interface IStorage {
   getUsersByStatus(status: 'pending' | 'active' | 'inactive'): Promise<User[]>;
   updateUserStatus(id: string, status: 'pending' | 'active' | 'inactive'): Promise<User | undefined>;
   getUsersByRole(role: 'admin' | 'driver'): Promise<User[]>;
+  createLocalUser(userData: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    password: string;
+    role: 'admin' | 'driver';
+    status: 'pending' | 'active' | 'inactive';
+  }): Promise<User>;
   
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
@@ -82,6 +91,36 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersByRole(role: 'admin' | 'driver'): Promise<User[]> {
     return await db.select().from(users).where(eq(users.role, role)).orderBy(desc(users.createdAt));
+  }
+
+  async createLocalUser(userData: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    password: string;
+    role: 'admin' | 'driver';
+    status: 'pending' | 'active' | 'inactive';
+  }): Promise<User> {
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(userData.password, 10);
+    
+    // Generate a unique ID
+    const uuid = crypto.randomUUID();
+    
+    const [user] = await db
+      .insert(users)
+      .values({
+        id: uuid,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        password: hashedPassword,
+        isLocalUser: 'true',
+        role: userData.role,
+        status: userData.status,
+      })
+      .returning();
+    return user;
   }
 
   // Order operations
