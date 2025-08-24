@@ -185,10 +185,19 @@ export class DatabaseStorage implements IStorage {
     return newOrder;
   }
 
-  async updateOrder(id: string, orderData: Partial<InsertOrder>): Promise<Order | undefined> {
+  async updateOrder(id: string, orderData: Partial<Order>): Promise<Order | undefined> {
+    const updateData = { ...orderData, updatedAt: new Date() };
+    // Ensure dates are Date objects, not strings
+    if (updateData.deliveryDate && typeof updateData.deliveryDate === 'string') {
+      updateData.deliveryDate = new Date(updateData.deliveryDate);
+    }
+    if (updateData.pickupDate && typeof updateData.pickupDate === 'string') {
+      updateData.pickupDate = new Date(updateData.pickupDate);
+    }
+    
     const [order] = await db
       .update(orders)
-      .set({ ...orderData, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(orders.id, id))
       .returning();
     return order;
@@ -331,7 +340,7 @@ export class DatabaseStorage implements IStorage {
       // Create order directly assigned to buyer
       const [newOrder] = await tx
         .insert(orders)
-        .values({
+        .values([{
           pickupLocation: auction.pickupLocation,
           deliveryLocation: auction.deliveryLocation,
           vehicleBrand: auction.vehicleBrand,
@@ -346,11 +355,11 @@ export class DatabaseStorage implements IStorage {
           price: auction.instantPrice,
           distance: auction.distance,
           notes: auction.notes,
-          status: 'in_progress', // Auction purchases are automatically accepted
+          status: 'assigned', // Start as assigned, will go to in_progress after pickup handover
           assignedDriverId: buyerId,
           createdById: auction.createdById,
           fromAuction: 'true',
-        })
+        }])
         .returning();
 
       // Create billing entry
@@ -513,7 +522,7 @@ export class DatabaseStorage implements IStorage {
 
   // Update order status after handover
   async updateOrderAfterHandover(orderId: string, type: 'pickup' | 'delivery'): Promise<Order | undefined> {
-    const newStatus = type === 'pickup' ? 'picked_up' : 'delivered';
+    const newStatus = type === 'pickup' ? 'in_progress' : 'completed';
     
     const [order] = await db
       .update(orders)

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { AuctionCard } from "@/components/driver/auction-card";
 import { AuctionPurchaseDialog } from "@/components/driver/auction-purchase-dialog";
 import { VehicleHandoverDialog } from "@/components/driver/vehicle-handover-dialog";
+import { Car, CheckCircle } from "lucide-react";
 import type { Order, Auction } from "@shared/schema";
 
 type ViewType = 'dashboard' | 'orders' | 'auctions' | 'billing' | 'history';
@@ -18,10 +19,10 @@ type ViewType = 'dashboard' | 'orders' | 'auctions' | 'billing' | 'history';
 export default function DriverDashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
-  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isHandoverDialogOpen, setIsHandoverDialogOpen] = useState(false);
   const [handoverMode, setHandoverMode] = useState<'pickup' | 'delivery'>('pickup');
+  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
 
@@ -405,7 +406,7 @@ export default function DriverDashboard() {
                   {getStatusBadge(order.status)}
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
                   <div>
                     <span className="text-gray-600 block">Fahrzeug:</span>
                     <span className="text-gray-900">{order.vehicleBrand} {order.vehicleModel}</span>
@@ -424,6 +425,62 @@ export default function DriverDashboard() {
                     <span className="text-gray-600 block">Distanz:</span>
                     <span className="text-gray-900">{order.distance} km</span>
                   </div>
+                </div>
+                
+                {/* Action buttons based on order status */}
+                <div className="flex flex-wrap gap-2">
+                  {order.status === 'assigned' && order.fromAuction !== 'true' && (
+                    <>
+                      <Button 
+                        onClick={() => acceptOrderMutation.mutate(order.id)}
+                        size="sm"
+                        disabled={acceptOrderMutation.isPending}
+                        data-testid={`button-accept-${order.id}`}
+                      >
+                        {acceptOrderMutation.isPending ? "Wird angenommen..." : "Annehmen"}
+                      </Button>
+                      <Button 
+                        onClick={() => rejectOrderMutation.mutate(order.id)}
+                        variant="outline"
+                        size="sm"
+                        disabled={rejectOrderMutation.isPending}
+                        data-testid={`button-reject-${order.id}`}
+                      >
+                        {rejectOrderMutation.isPending ? "Wird abgelehnt..." : "Ablehnen"}
+                      </Button>
+                    </>
+                  )}
+                  
+                  {order.status === 'assigned' && order.fromAuction === 'true' && (
+                    <Button 
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setHandoverMode('pickup');
+                        setIsHandoverDialogOpen(true);
+                      }}
+                      size="sm"
+                      data-testid={`button-pickup-${order.id}`}
+                    >
+                      <Car className="w-4 h-4 mr-2" />
+                      Fahrzeug übernehmen
+                    </Button>
+                  )}
+                  
+                  {order.status === 'in_progress' && (
+                    <Button 
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setHandoverMode('delivery');
+                        setIsHandoverDialogOpen(true);
+                      }}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      data-testid={`button-delivery-${order.id}`}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Fahrzeug übergeben
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
