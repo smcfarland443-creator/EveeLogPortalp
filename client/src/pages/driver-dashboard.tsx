@@ -9,18 +9,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AuctionCard } from "@/components/driver/auction-card";
+import { AuctionPurchaseDialog } from "@/components/driver/auction-purchase-dialog";
 import type { Order, Auction } from "@shared/schema";
 
 type ViewType = 'dashboard' | 'orders' | 'auctions' | 'history';
 
 export default function DriverDashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+  const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
+  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
 
   // Redirect to login if not authenticated
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'driver')) {
+    if (!authLoading && (!user || (user as any)?.role !== 'driver')) {
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
@@ -36,12 +39,12 @@ export default function DriverDashboard() {
   // Fetch data
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["/api/orders"],
-    enabled: !!user && user.role === 'driver',
+    enabled: !!user && (user as any)?.role === 'driver',
   });
 
   const { data: auctions = [], isLoading: auctionsLoading } = useQuery({
     queryKey: ["/api/auctions"],
-    enabled: !!user && user.role === 'driver',
+    enabled: !!user && (user as any)?.role === 'driver',
   });
 
   // Mutations
@@ -69,31 +72,15 @@ export default function DriverDashboard() {
     },
   });
 
-  const purchaseAuctionMutation = useMutation({
-    mutationFn: async (auctionId: string) => {
-      const response = await apiRequest("POST", `/api/auctions/${auctionId}/purchase`);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auctions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({ title: "Success", description: "Auction purchased successfully!" });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({ title: "Error", description: "Failed to purchase auction", variant: "destructive" });
-    },
-  });
+  const handlePurchaseClick = (auction: Auction) => {
+    setSelectedAuction(auction);
+    setIsPurchaseDialogOpen(true);
+  };
+
+  const handleClosePurchaseDialog = () => {
+    setSelectedAuction(null);
+    setIsPurchaseDialogOpen(false);
+  };
 
   const acceptOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
@@ -429,8 +416,8 @@ export default function DriverDashboard() {
             <AuctionCard
               key={auction.id}
               auction={auction}
-              onPurchase={() => purchaseAuctionMutation.mutate(auction.id)}
-              isPurchasing={purchaseAuctionMutation.isPending}
+              onPurchase={() => handlePurchaseClick(auction)}
+              isPurchasing={false}
             />
           ))
         )}
@@ -499,6 +486,13 @@ export default function DriverDashboard() {
           {currentView === 'auctions' && renderAuctionsContent()}
         </div>
       </div>
+
+      {/* Purchase Dialog */}
+      <AuctionPurchaseDialog
+        auction={selectedAuction}
+        isOpen={isPurchaseDialogOpen}
+        onClose={handleClosePurchaseDialog}
+      />
     </div>
   );
 }

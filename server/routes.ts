@@ -231,7 +231,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/orders/:id/status', isAuthenticated, async (req: any, res) => {
     try {
       const { status } = req.body;
-      const order = await storage.updateOrderStatus(req.params.id, status);
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Pass driverId for cancellation fee logic
+      const driverId = currentUser?.role === 'driver' ? req.user.claims.sub : undefined;
+      const order = await storage.updateOrderStatus(req.params.id, status, driverId);
+      
       res.json(order);
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -304,31 +309,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only drivers can purchase auctions" });
       }
 
-      const auction = await storage.purchaseAuction(req.params.id, req.user.claims.sub);
-      
-      if (!auction) {
+      if (currentUser.status !== 'active') {
+        return res.status(403).json({ message: "Account must be active to purchase auctions" });
+      }
+
+      const result = await storage.purchaseAuction(req.params.id, req.user.claims.sub);
+      if (!result) {
         return res.status(404).json({ message: "Auction not found or already sold" });
       }
 
-      // Create an order from the purchased auction
-      const orderData = {
-        pickupLocation: auction.pickupLocation,
-        deliveryLocation: auction.deliveryLocation,
-        vehicleBrand: auction.vehicleBrand,
-        vehicleModel: auction.vehicleModel,
-        vehicleYear: auction.vehicleYear,
-        pickupDate: auction.pickupDate,
-        deliveryDate: auction.deliveryDate,
-        price: auction.instantPrice,
-        distance: auction.distance,
-        notes: auction.notes,
-        status: 'assigned' as const,
-        assignedDriverId: req.user.claims.sub,
-        createdById: auction.createdById,
-      };
-
-      const order = await storage.createOrder(orderData);
-      res.json({ auction, order });
+      res.json({ 
+        message: "Auction purchased successfully and order created",
+        auction: result.auction,
+        order: result.order
+      });
     } catch (error) {
       console.error("Error purchasing auction:", error);
       res.status(500).json({ message: "Failed to purchase auction" });
@@ -367,6 +361,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting auction:", error);
       res.status(500).json({ message: "Failed to delete auction" });
+    }
+  });
+
+  // Purchase auction (driver)
+  app.post('/api/auctions/:id/purchase', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'driver') {
+        return res.status(403).json({ message: "Only drivers can purchase auctions" });
+      }
+
+      if (currentUser.status !== 'active') {
+        return res.status(403).json({ message: "Account must be active to purchase auctions" });
+      }
+
+      const result = await storage.purchaseAuction(req.params.id, req.user.claims.sub);
+      if (!result) {
+        return res.status(404).json({ message: "Auction not found or already sold" });
+      }
+
+      res.json({ 
+        message: "Auction purchased successfully and order created",
+        auction: result.auction,
+        order: result.order
+      });
+    } catch (error) {
+      console.error("Error purchasing auction:", error);
+      res.status(500).json({ message: "Failed to purchase auction" });
+    }
+  });
+
+  // Get billing data
+  app.get('/api/billing', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      if (currentUser?.role === 'admin') {
+        const billings = await storage.getAllBillings();
+        res.json(billings);
+      } else {
+        const billings = await storage.getBillingsByUser(req.user.claims.sub);
+        res.json(billings);
+      }
+    } catch (error) {
+      console.error("Error fetching billing data:", error);
+      res.status(500).json({ message: "Failed to fetch billing data" });
     }
   });
 

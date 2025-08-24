@@ -9,6 +9,7 @@ import {
   text,
   integer,
   decimal,
+  boolean,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -37,6 +38,12 @@ export const orderStatusEnum = pgEnum('order_status', ['open', 'assigned', 'in_p
 // Auction status enum
 export const auctionStatusEnum = pgEnum('auction_status', ['active', 'sold', 'cancelled']);
 
+// Billing status enum
+export const billingStatusEnum = pgEnum('billing_status', ['pending', 'paid', 'cancelled']);
+
+// Billing type enum
+export const billingTypeEnum = pgEnum('billing_type', ['order_payment', 'cancellation_fee', 'credit', 'debit']);
+
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey(),
@@ -62,12 +69,17 @@ export const orders = pgTable("orders", {
   vehicleYear: integer("vehicle_year"),
   pickupDate: timestamp("pickup_date").notNull(),
   deliveryDate: timestamp("delivery_date"),
+  pickupTimeFrom: varchar("pickup_time_from"), // e.g., "08:00"
+  pickupTimeTo: varchar("pickup_time_to"), // e.g., "14:00"
+  deliveryTimeFrom: varchar("delivery_time_from"),
+  deliveryTimeTo: varchar("delivery_time_to"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   distance: integer("distance"), // in km
   notes: text("notes"),
   status: orderStatusEnum("status").notNull().default('open'),
   assignedDriverId: varchar("assigned_driver_id").references(() => users.id),
   createdById: varchar("created_by_id").notNull().references(() => users.id),
+  fromAuction: varchar("from_auction").default('false'), // 'true' if purchased from auction
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -82,6 +94,10 @@ export const auctions = pgTable("auctions", {
   vehicleYear: integer("vehicle_year"),
   pickupDate: timestamp("pickup_date").notNull(),
   deliveryDate: timestamp("delivery_date"),
+  pickupTimeFrom: varchar("pickup_time_from"), // mandatory for auctions
+  pickupTimeTo: varchar("pickup_time_to"), // mandatory for auctions
+  deliveryTimeFrom: varchar("delivery_time_from"), // mandatory for auctions
+  deliveryTimeTo: varchar("delivery_time_to"), // mandatory for auctions
   instantPrice: decimal("instant_price", { precision: 10, scale: 2 }).notNull(),
   distance: integer("distance"), // in km
   notes: text("notes"),
@@ -124,6 +140,41 @@ export const auctionsRelations = relations(auctions, ({ one }) => ({
     fields: [auctions.createdById],
     references: [users.id],
     relationName: "createdAuctions",
+  }),
+}));
+
+// Billing table for accounting system
+export const billings = pgTable("billings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id), // Driver or admin
+  orderId: varchar("order_id").references(() => orders.id), // Related order if applicable
+  auctionId: varchar("auction_id").references(() => auctions.id), // Related auction if applicable
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  type: billingTypeEnum("type").notNull(), // order_payment, cancellation_fee, credit, debit
+  status: billingStatusEnum("status").notNull().default('pending'),
+  description: text("description").notNull(),
+  createdById: varchar("created_by_id").notNull().references(() => users.id), // Who created this billing entry
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Relations for billing
+export const billingsRelations = relations(billings, ({ one }) => ({
+  user: one(users, {
+    fields: [billings.userId],
+    references: [users.id],
+  }),
+  order: one(orders, {
+    fields: [billings.orderId],
+    references: [orders.id],
+  }),
+  auction: one(auctions, {
+    fields: [billings.auctionId],
+    references: [auctions.id],
+  }),
+  createdBy: one(users, {
+    fields: [billings.createdById],
+    references: [users.id],
   }),
 }));
 
@@ -171,6 +222,16 @@ export const insertAuctionSchema = createInsertSchema(auctions).omit({
   deliveryDate: z.union([z.string(), z.date(), z.undefined()]).transform((val) => 
     val && typeof val === 'string' ? new Date(val) : val
   ).optional(),
+  pickupTimeFrom: z.string().min(1, "Abholzeit von ist erforderlich"),
+  pickupTimeTo: z.string().min(1, "Abholzeit bis ist erforderlich"),
+  deliveryTimeFrom: z.string().min(1, "Zustellzeit von ist erforderlich"),
+  deliveryTimeTo: z.string().min(1, "Zustellzeit bis ist erforderlich"),
+});
+
+export const insertBillingSchema = createInsertSchema(billings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 // Types
@@ -181,3 +242,5 @@ export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Auction = typeof auctions.$inferSelect;
 export type InsertAuction = z.infer<typeof insertAuctionSchema>;
+export type Billing = typeof billings.$inferSelect;
+export type InsertBilling = z.infer<typeof insertBillingSchema>;

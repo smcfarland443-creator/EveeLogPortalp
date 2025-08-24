@@ -2,12 +2,15 @@ import {
   users,
   orders,
   auctions,
+  billings,
   type User,
   type UpsertUser,
   type Order,
   type InsertOrder,
   type Auction,
   type InsertAuction,
+  type Billing,
+  type InsertBilling,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -48,9 +51,14 @@ export interface IStorage {
   createAuction(auction: InsertAuction): Promise<Auction>;
   getActiveAuctions(): Promise<Auction[]>;
   getAuctionById(id: string): Promise<Auction | undefined>;
-  purchaseAuction(auctionId: string, buyerId: string): Promise<Auction | undefined>;
+  purchaseAuction(auctionId: string, buyerId: string): Promise<{ auction: Auction; order: Order } | undefined>;
   updateAuctionStatus(id: string, status: 'active' | 'sold' | 'cancelled'): Promise<Auction | undefined>;
   deleteAuction(id: string): Promise<boolean>;
+  
+  // Billing operations
+  createBilling(billing: { userId: string; orderId?: string; auctionId?: string; amount: string; type: 'order_payment' | 'cancellation_fee' | 'credit' | 'debit'; description: string; createdById: string }): Promise<any>;
+  getBillingsByUser(userId: string): Promise<any[]>;
+  getAllBillings(): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -155,13 +163,36 @@ export class DatabaseStorage implements IStorage {
     return order;
   }
 
-  async updateOrderStatus(id: string, status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled'): Promise<Order | undefined> {
-    const [order] = await db
-      .update(orders)
-      .set({ status, updatedAt: new Date() })
-      .where(eq(orders.id, id))
-      .returning();
-    return order;
+  async updateOrderStatus(id: string, status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled', driverId?: string): Promise<Order | undefined> {
+    return await db.transaction(async (tx) => {
+      // Get the order first to check if it's from auction
+      const [order] = await tx.select().from(orders).where(eq(orders.id, id));
+      if (!order) return undefined;
+
+      // Update order status
+      const [updatedOrder] = await tx
+        .update(orders)
+        .set({ status, updatedAt: new Date() })
+        .where(eq(orders.id, id))
+        .returning();
+
+      // If cancelling an order from auction, charge 10% cancellation fee
+      if (status === 'cancelled' && order.fromAuction === 'true' && driverId) {
+        const cancellationFeeAmount = (parseFloat(order.price) * 0.1).toFixed(2);
+        await tx
+          .insert(billings)
+          .values({
+            userId: driverId,
+            orderId: order.id,
+            amount: cancellationFeeAmount,
+            type: 'cancellation_fee',
+            description: `Storno-Gebühr für Auktionskauf: ${order.vehicleBrand} ${order.vehicleModel} (10% von €${order.price})`,
+            createdById: order.createdById,
+          });
+      }
+
+      return updatedOrder;
+    });
   }
 
   async assignOrderToDriver(orderId: string, driverId: string): Promise<Order | undefined> {
@@ -215,18 +246,72 @@ export class DatabaseStorage implements IStorage {
     return auction;
   }
 
-  async purchaseAuction(auctionId: string, buyerId: string): Promise<Auction | undefined> {
-    const [auction] = await db
-      .update(auctions)
-      .set({ 
-        status: 'sold', 
-        purchasedById: buyerId, 
-        purchasedAt: new Date(),
-        updatedAt: new Date() 
-      })
-      .where(and(eq(auctions.id, auctionId), eq(auctions.status, 'active')))
-      .returning();
-    return auction;
+  async purchaseAuction(auctionId: string, buyerId: string): Promise<{ auction: Auction; order: Order } | undefined> {
+    return await db.transaction(async (tx) => {
+      // Get and lock auction, verify status
+      const [auction] = await tx.select().from(auctions).where(eq(auctions.id, auctionId));
+      if (!auction || auction.status !== 'active') {
+        return undefined; // Auction not found or not available
+      }
+
+      // Update auction status with active guard (prevents race conditions)
+      const updatedAuctions = await tx
+        .update(auctions)
+        .set({ 
+          status: 'sold',
+          purchasedById: buyerId,
+          purchasedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(and(eq(auctions.id, auctionId), eq(auctions.status, 'active')))
+        .returning();
+
+      if (updatedAuctions.length === 0) {
+        return undefined; // Already sold by another transaction
+      }
+
+      const updatedAuction = updatedAuctions[0];
+
+      // Create order directly assigned to buyer
+      const [newOrder] = await tx
+        .insert(orders)
+        .values({
+          pickupLocation: auction.pickupLocation,
+          deliveryLocation: auction.deliveryLocation,
+          vehicleBrand: auction.vehicleBrand,
+          vehicleModel: auction.vehicleModel,
+          vehicleYear: auction.vehicleYear,
+          pickupDate: auction.pickupDate,
+          deliveryDate: auction.deliveryDate,
+          pickupTimeFrom: auction.pickupTimeFrom,
+          pickupTimeTo: auction.pickupTimeTo,
+          deliveryTimeFrom: auction.deliveryTimeFrom,
+          deliveryTimeTo: auction.deliveryTimeTo,
+          price: auction.instantPrice,
+          distance: auction.distance,
+          notes: auction.notes,
+          status: 'assigned', // Directly assigned, no accept/reject needed
+          assignedDriverId: buyerId,
+          createdById: auction.createdById,
+          fromAuction: 'true',
+        })
+        .returning();
+
+      // Create billing entry
+      await tx
+        .insert(billings)
+        .values({
+          userId: buyerId,
+          orderId: newOrder.id,
+          auctionId: auction.id,
+          amount: auction.instantPrice,
+          type: 'order_payment',
+          description: `Auktionskauf: ${auction.vehicleBrand} ${auction.vehicleModel} von ${auction.pickupLocation} nach ${auction.deliveryLocation}`,
+          createdById: auction.createdById,
+        });
+
+      return { auction: updatedAuction, order: newOrder };
+    });
   }
 
   async updateAuctionStatus(id: string, status: 'active' | 'sold' | 'cancelled'): Promise<Auction | undefined> {
@@ -240,7 +325,32 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAuction(id: string): Promise<boolean> {
     const result = await db.delete(auctions).where(eq(auctions.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Billing operations
+  async createBilling(billing: { 
+    userId: string; 
+    orderId?: string; 
+    auctionId?: string; 
+    amount: string; 
+    type: 'order_payment' | 'cancellation_fee' | 'credit' | 'debit'; 
+    description: string; 
+    createdById: string 
+  }): Promise<Billing> {
+    const [newBilling] = await db
+      .insert(billings)
+      .values(billing)
+      .returning();
+    return newBilling;
+  }
+
+  async getBillingsByUser(userId: string): Promise<Billing[]> {
+    return await db.select().from(billings).where(eq(billings.userId, userId)).orderBy(desc(billings.createdAt));
+  }
+
+  async getAllBillings(): Promise<Billing[]> {
+    return await db.select().from(billings).orderBy(desc(billings.createdAt));
   }
 }
 
