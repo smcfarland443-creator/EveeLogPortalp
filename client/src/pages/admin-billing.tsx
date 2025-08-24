@@ -35,10 +35,7 @@ export default function AdminBilling() {
   // Create billing mutation
   const createBillingMutation = useMutation({
     mutationFn: async (data: { orderId: string; driverId: string; amount: string }) => {
-      return await apiRequest("/api/admin/billing/create", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/admin/billing/create", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/billing/pending"] });
@@ -56,13 +53,10 @@ export default function AdminBilling() {
   // Approve/reject billing mutation
   const updateBillingMutation = useMutation({
     mutationFn: async (data: { billingId: string; status: string; adminNotes?: string; newAmount?: string }) => {
-      return await apiRequest(`/api/admin/billing/${data.billingId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          status: data.status,
-          adminNotes: data.adminNotes,
-          newAmount: data.newAmount,
-        }),
+      return await apiRequest("PATCH", `/api/admin/billing/${data.billingId}/status`, {
+        status: data.status,
+        adminNotes: data.adminNotes,
+        newAmount: data.newAmount,
       });
     },
     onSuccess: () => {

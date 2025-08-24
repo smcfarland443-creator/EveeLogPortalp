@@ -8,6 +8,7 @@ import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import DriverDashboard from "@/pages/driver-dashboard";
+import DisponentDashboard from "@/pages/disponent-dashboard";
 import { useAuth } from "@/hooks/useAuth";
 
 function Router() {
@@ -30,6 +31,8 @@ function Router() {
         <>
           {user?.role === 'admin' ? (
             <Route path="/" component={AdminDashboard} />
+          ) : user?.role === 'disponent' ? (
+            <Route path="/" component={DisponentDashboard} />
           ) : (
             <Route path="/" component={DriverDashboard} />
           )}

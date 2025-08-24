@@ -13,7 +13,7 @@ import { AuctionPurchaseDialog } from "@/components/driver/auction-purchase-dial
 import { VehicleHandoverDialog } from "@/components/driver/vehicle-handover-dialog";
 import type { Order, Auction } from "@shared/schema";
 
-type ViewType = 'dashboard' | 'orders' | 'auctions' | 'history';
+type ViewType = 'dashboard' | 'orders' | 'auctions' | 'billing' | 'history';
 
 export default function DriverDashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -48,6 +48,11 @@ export default function DriverDashboard() {
 
   const { data: auctions = [], isLoading: auctionsLoading } = useQuery({
     queryKey: ["/api/auctions"],
+    enabled: !!user && (user as any)?.role === 'driver',
+  });
+
+  const { data: billings = [], isLoading: billingsLoading } = useQuery({
+    queryKey: ["/api/billing"],
     enabled: !!user && (user as any)?.role === 'driver',
   });
 
@@ -162,7 +167,7 @@ export default function DriverDashboard() {
   }
 
   const assignedOrders = typedOrders.filter((order: Order) => 
-    order.status === 'assigned' || 
+    (order.status === 'assigned' && order.fromAuction !== 'true') || // Manual assignments that need acceptance
     order.status === 'in_progress' || 
     order.status === 'pickup_scheduled' || 
     order.status === 'picked_up'
@@ -472,6 +477,74 @@ export default function DriverDashboard() {
     </div>
   );
 
+  const renderBillingContent = () => (
+    <div>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Meine Abrechnung</h1>
+        <p className="text-gray-600">Übersicht Ihrer Abrechnungen und Verdienste</p>
+      </div>
+
+      <div className="space-y-6">
+        {billingsLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+          </div>
+        ) : billings.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            Keine Abrechnungen vorhanden
+          </div>
+        ) : (
+          billings.map((billing: any) => (
+            <Card key={billing.id}>
+              <CardContent className="pt-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h4 className="font-medium text-gray-900">Abrechnung #{billing.id.slice(-4)}</h4>
+                    <p className="text-sm text-gray-600">
+                      Auftrag #{billing.orderId?.slice(-4)} • {new Date(billing.createdAt).toLocaleDateString('de-DE')}
+                    </p>
+                  </div>
+                  <Badge 
+                    variant={
+                      billing.status === 'approved' ? 'default' : 
+                      billing.status === 'rejected' ? 'destructive' : 
+                      'secondary'
+                    }
+                  >
+                    {billing.status === 'pending' && 'Ausstehend'}
+                    {billing.status === 'approved' && 'Genehmigt'}
+                    {billing.status === 'rejected' && 'Abgelehnt'}
+                  </Badge>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4">
+                  <div>
+                    <span className="text-gray-600 block">Betrag:</span>
+                    <span className="text-gray-900 font-medium">€{billing.amount}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 block">Status:</span>
+                    <span className="text-gray-900">
+                      {billing.status === 'pending' && 'Wird geprüft'}
+                      {billing.status === 'approved' && 'Ausgezahlt'}
+                      {billing.status === 'rejected' && 'Zurückgewiesen'}
+                    </span>
+                  </div>
+                  {billing.adminNotes && (
+                    <div>
+                      <span className="text-gray-600 block">Notizen:</span>
+                      <span className="text-gray-900">{billing.adminNotes}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-full">
       <Navigation 
@@ -523,6 +596,19 @@ export default function DriverDashboard() {
                 <i className="fas fa-gavel mr-3"></i>
                 Auktionen
               </button>
+              
+              <button
+                onClick={() => setCurrentView('billing')}
+                className={`w-full text-left group flex items-center px-4 py-3 text-sm font-medium rounded-lg ${
+                  currentView === 'billing'
+                    ? 'bg-primary-50 text-primary-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+                data-testid="nav-billing"
+              >
+                <i className="fas fa-receipt mr-3"></i>
+                Meine Abrechnung
+              </button>
             </div>
           </nav>
         </div>
@@ -531,6 +617,7 @@ export default function DriverDashboard() {
           {currentView === 'dashboard' && renderDashboardContent()}
           {currentView === 'orders' && renderOrdersContent()}
           {currentView === 'auctions' && renderAuctionsContent()}
+          {currentView === 'billing' && renderBillingContent()}
         </div>
       </div>
 

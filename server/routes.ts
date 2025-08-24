@@ -32,7 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let users;
       
       if (role) {
-        users = await storage.getUsersByRole(role as 'admin' | 'driver');
+        users = await storage.getUsersByRole(role as 'admin' | 'driver' | 'disponent');
       } else if (status) {
         users = await storage.getUsersByStatus(status as 'pending' | 'active' | 'inactive');
       } else {
@@ -119,6 +119,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (currentUser?.role === 'admin') {
         const orders = await storage.getOrders();
         res.json(orders);
+      } else if (currentUser?.role === 'disponent') {
+        // Disponents only see orders they created
+        const orders = await storage.getOrdersByCreator(req.user.claims.sub);
+        res.json(orders);
       } else {
         // Drivers only see their assigned orders
         const orders = await storage.getOrdersByDriver(req.user.claims.sub);
@@ -133,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
       const currentUser = await storage.getUser(req.user.claims.sub);
-      if (currentUser?.role !== 'admin') {
+      if (currentUser?.role !== 'admin' && currentUser?.role !== 'disponent') {
         return res.status(403).json({ message: "Access denied" });
       }
 

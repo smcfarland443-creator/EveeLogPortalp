@@ -97,7 +97,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getUsersByRole(role: 'admin' | 'driver'): Promise<User[]> {
+  async getUsersByRole(role: 'admin' | 'driver' | 'disponent'): Promise<User[]> {
     return await db.select().from(users).where(eq(users.role, role)).orderBy(desc(users.createdAt));
   }
 
@@ -106,7 +106,7 @@ export class DatabaseStorage implements IStorage {
     firstName: string;
     lastName: string;
     password: string;
-    role: 'admin' | 'driver';
+    role: 'admin' | 'driver' | 'disponent';
     status: 'pending' | 'active' | 'inactive';
   }): Promise<User> {
     // Hash the password
@@ -155,6 +155,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(orders)
       .where(eq(orders.assignedDriverId, driverId))
+      .orderBy(desc(orders.createdAt));
+  }
+
+  async getOrdersByCreator(creatorId: string): Promise<Order[]> {
+    return await db
+      .select()
+      .from(orders)
+      .where(eq(orders.createdById, creatorId))
       .orderBy(desc(orders.createdAt));
   }
 
@@ -290,7 +298,7 @@ export class DatabaseStorage implements IStorage {
           price: auction.instantPrice,
           distance: auction.distance,
           notes: auction.notes,
-          status: 'assigned', // Directly assigned, no accept/reject needed
+          status: 'in_progress', // Auction purchases are automatically accepted
           assignedDriverId: buyerId,
           createdById: auction.createdById,
           fromAuction: 'true',
