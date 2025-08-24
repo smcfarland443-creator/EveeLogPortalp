@@ -111,6 +111,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete user
+  app.delete('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Prevent admin from deleting themselves
+      if (req.params.id === req.user.claims.sub) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      await storage.deleteUser(req.params.id);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Update user
+  app.patch('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { email, firstName, lastName, password, role, status } = req.body;
+      
+      const user = await storage.updateUser(req.params.id, {
+        email,
+        firstName,
+        lastName,
+        password,
+        role,
+        status,
+      });
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(user);
+    } catch (error: any) {
+      console.error("Error updating user:", error);
+      if (error.code === '23505') { // Unique constraint violation
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
   // Order management routes
   app.get('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
@@ -507,25 +561,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const orderId = req.params.id;
       const { type, pickupKm, deliveryKm, condition, damageNotes, pickupNotes, deliveryNotes } = req.body;
+      
+      // Validate the order exists and user is assigned to it
+      const order = await storage.getOrderById(orderId);
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+      
+      if (order.assignedDriverId !== req.user.claims.sub) {
+        return res.status(403).json({ message: 'Not authorized for this order' });
+      }
 
+      // Prepare handover data
+      const handoverType = type as 'pickup' | 'delivery';
+      const kmReading = handoverType === 'pickup' ? parseInt(pickupKm) : parseInt(deliveryKm);
+      const notes = handoverType === 'pickup' ? pickupNotes : deliveryNotes;
+      
       // Create handover record
       const handover = await storage.createVehicleHandover({
         orderId,
-        type,
-        kmReading: type === 'pickup' ? pickupKm : deliveryKm,
-        condition,
-        damageNotes,
-        notes: type === 'pickup' ? pickupNotes : deliveryNotes,
         driverId: req.user.claims.sub,
+        handoverType,
+        kmReading,
+        fuelLevel: null,
+        vehicleCondition: condition,
+        damageNotes: damageNotes || null,
+        photos: [],
+        signature: null,
+        location: handoverType === 'pickup' ? order.pickupLocation : order.deliveryLocation,
       });
 
-      // Update order status
-      const updatedOrder = await storage.updateOrderAfterHandover(orderId, type);
+      // Update order status based on handover type
+      let newStatus: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+      if (handoverType === 'pickup') {
+        newStatus = 'in_progress';
+      } else {
+        newStatus = 'completed';
+      }
+      
+      const updatedOrder = await storage.updateOrderStatus(orderId, newStatus);
 
       res.json({ handover, order: updatedOrder });
     } catch (error) {
       console.error("Error creating vehicle handover:", error);
       res.status(500).json({ message: "Failed to create vehicle handover" });
+    }
+  });
+  
+  // Get handovers for an order
+  app.get('/api/orders/:id/handovers', isAuthenticated, async (req: any, res) => {
+    try {
+      const orderId = req.params.id;
+      const handovers = await storage.getHandoversByOrder(orderId);
+      res.json(handovers);
+    } catch (error) {
+      console.error('Error fetching handovers:', error);
+      res.status(500).json({ message: 'Failed to fetch handovers' });
     }
   });
 

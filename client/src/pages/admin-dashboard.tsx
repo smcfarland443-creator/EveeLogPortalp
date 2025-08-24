@@ -15,8 +15,28 @@ import { AuctionFormModal } from "@/components/admin/auction-form-modal";
 import { UserFormModal } from "@/components/admin/user-form-modal";
 import AdminBilling from "@/pages/admin-billing";
 import type { User, Order, Auction } from "@shared/schema";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
 type ViewType = 'dashboard' | 'orders' | 'auctions' | 'users' | 'billing' | 'reports';
+
+// Schema for editing users
+const editUserSchema = z.object({
+  firstName: z.string().min(1, "Vorname ist erforderlich"),
+  lastName: z.string().min(1, "Nachname ist erforderlich"),
+  email: z.string().email("Gültige E-Mail-Adresse erforderlich"),
+  password: z.string().optional(),
+  role: z.enum(['admin', 'driver', 'disponent']),
+  status: z.enum(['pending', 'active', 'inactive']),
+});
+
+type EditUserFormData = z.infer<typeof editUserSchema>;
 
 export default function AdminDashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -25,6 +45,9 @@ export default function AdminDashboard() {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [showAuctionModal, setShowAuctionModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
 
@@ -89,6 +112,61 @@ export default function AdminDashboard() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("DELETE", `/api/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setUserToDelete(null);
+      toast({ title: "Erfolg", description: "Benutzer erfolgreich gelöscht" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({ title: "Fehler", description: "Benutzer konnte nicht gelöscht werden", variant: "destructive" });
+    },
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: EditUserFormData }) => {
+      const updateData = { ...data };
+      if (!data.password || data.password.trim() === '') {
+        delete updateData.password;
+      }
+      await apiRequest("PATCH", `/api/users/${userId}`, updateData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setShowEditModal(false);
+      setEditingUser(null);
+      toast({ title: "Erfolg", description: "Benutzer erfolgreich aktualisiert" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({ title: "Fehler", description: "Benutzer konnte nicht aktualisiert werden", variant: "destructive" });
+    },
+  });
+
   const deleteOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
       await apiRequest("DELETE", `/api/orders/${orderId}`);
@@ -137,10 +215,49 @@ export default function AdminDashboard() {
     },
   });
 
+  // Edit User Form
+  const editForm = useForm<EditUserFormData>({
+    resolver: zodResolver(editUserSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+      role: "driver",
+      status: "active",
+    },
+  });
+
+  // Update form when editing user changes
+  useEffect(() => {
+    if (editingUser) {
+      editForm.reset({
+        firstName: editingUser.firstName || "",
+        lastName: editingUser.lastName || "",
+        email: editingUser.email || "",
+        password: "",
+        role: editingUser.role as 'admin' | 'driver' | 'disponent',
+        status: editingUser.status as 'pending' | 'active' | 'inactive',
+      });
+    }
+  }, [editingUser, editForm]);
+
   // Functions
   const handleEditOrder = (order: Order) => {
     setEditingOrder(order);
     setShowOrderEditModal(true);
+  };
+
+  const handleEditUser = (data: EditUserFormData) => {
+    if (editingUser) {
+      updateUserMutation.mutate({ userId: editingUser.id, data });
+    }
+  };
+
+  const handleDeleteUser = () => {
+    if (userToDelete) {
+      deleteUserMutation.mutate(userToDelete);
+    }
   };
 
   const handleCloseEditOrder = () => {
@@ -536,12 +653,39 @@ export default function AdminDashboard() {
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Rolle:</span>
-                    <Badge variant="outline">{userItem.role === 'driver' ? 'Fahrer' : 'Admin'}</Badge>
+                    <Badge variant="outline">
+                      {userItem.role === 'driver' ? 'Fahrer' : 
+                       userItem.role === 'admin' ? 'Admin' : 
+                       userItem.role === 'disponent' ? 'Disponent' : userItem.role}
+                    </Badge>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Status:</span>
                     {getStatusBadge(userItem.status)}
                   </div>
+                </div>
+                
+                <div className="flex space-x-2 mt-4 pt-4 border-t border-gray-200">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingUser(userItem);
+                      setShowEditModal(true);
+                    }}
+                    data-testid={`button-edit-user-${userItem.id}`}
+                  >
+                    <i className="fas fa-edit mr-1"></i>Bearbeiten
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setUserToDelete(userItem.id)}
+                    disabled={userItem.id === user?.id}
+                    data-testid={`button-delete-user-${userItem.id}`}
+                  >
+                    <i className="fas fa-trash mr-1"></i>Löschen
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -661,6 +805,161 @@ export default function AdminDashboard() {
         isOpen={showUserModal} 
         onClose={() => setShowUserModal(false)} 
       />
+      
+      {/* Edit User Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Benutzer bearbeiten</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleEditUser)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vorname</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="edit-input-first-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nachname</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="edit-input-last-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>E-Mail</FormLabel>
+                    <FormControl>
+                      <Input type="email" {...field} data-testid="edit-input-email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Neues Passwort (optional)</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="Leer lassen für keine Änderung" {...field} data-testid="edit-input-password" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rolle</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="edit-select-role">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="driver">Fahrer</SelectItem>
+                        <SelectItem value="admin">Administrator</SelectItem>
+                        <SelectItem value="disponent">Disponent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="edit-select-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="active">Aktiv</SelectItem>
+                        <SelectItem value="pending">Wartend</SelectItem>
+                        <SelectItem value="inactive">Inaktiv</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => setShowEditModal(false)}
+                  data-testid="edit-button-cancel"
+                >
+                  Abbrechen
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={updateUserMutation.isPending}
+                  data-testid="edit-button-submit"
+                >
+                  {updateUserMutation.isPending ? "Speichere..." : "Speichern"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete User Confirmation */}
+      <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Benutzer löschen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sind Sie sicher, dass Sie diesen Benutzer löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="delete-cancel">Abbrechen</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteUser}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="delete-confirm"
+            >
+              Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

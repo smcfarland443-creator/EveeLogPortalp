@@ -3,6 +3,7 @@ import {
   orders,
   auctions,
   billings,
+  vehicleHandovers,
   type User,
   type UpsertUser,
   type Order,
@@ -11,6 +12,8 @@ import {
   type InsertAuction,
   type Billing,
   type InsertBilling,
+  type VehicleHandover,
+  type InsertVehicleHandover,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -25,21 +28,31 @@ export interface IStorage {
   // Additional user operations
   getUsersByStatus(status: 'pending' | 'active' | 'inactive'): Promise<User[]>;
   updateUserStatus(id: string, status: 'pending' | 'active' | 'inactive'): Promise<User | undefined>;
-  getUsersByRole(role: 'admin' | 'driver'): Promise<User[]>;
+  getUsersByRole(role: 'admin' | 'driver' | 'disponent'): Promise<User[]>;
   createLocalUser(userData: {
     email: string;
     firstName: string;
     lastName: string;
     password: string;
-    role: 'admin' | 'driver';
+    role: 'admin' | 'driver' | 'disponent';
     status: 'pending' | 'active' | 'inactive';
   }): Promise<User>;
+  deleteUser(id: string): Promise<void>;
+  updateUser(id: string, userData: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    role?: 'admin' | 'driver' | 'disponent';
+    status?: 'pending' | 'active' | 'inactive';
+  }): Promise<User | undefined>;
   
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, orderData: Partial<InsertOrder>): Promise<Order | undefined>;
   getOrders(): Promise<Order[]>;
   getOrdersByDriver(driverId: string): Promise<Order[]>;
+  getOrdersByCreator(creatorId: string): Promise<Order[]>;
   getOrderById(id: string): Promise<Order | undefined>;
   updateOrderStatus(id: string, status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled'): Promise<Order | undefined>;
   assignOrderToDriver(orderId: string, driverId: string): Promise<Order | undefined>;
@@ -59,6 +72,11 @@ export interface IStorage {
   createBilling(billing: { userId: string; orderId?: string; auctionId?: string; amount: string; type: 'order_payment' | 'cancellation_fee' | 'credit' | 'debit'; description: string; createdById: string }): Promise<any>;
   getBillingsByUser(userId: string): Promise<any[]>;
   getAllBillings(): Promise<any[]>;
+  
+  // Vehicle handover operations
+  createVehicleHandover(handover: InsertVehicleHandover): Promise<VehicleHandover>;
+  getHandoversByOrder(orderId: string): Promise<VehicleHandover[]>;
+  getHandoversByDriver(driverId: string): Promise<VehicleHandover[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -127,6 +145,33 @@ export class DatabaseStorage implements IStorage {
         role: userData.role,
         status: userData.status,
       })
+      .returning();
+    return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
+  }
+
+  async updateUser(id: string, userData: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    role?: 'admin' | 'driver' | 'disponent';
+    status?: 'pending' | 'active' | 'inactive';
+  }): Promise<User | undefined> {
+    const updateData: any = { ...userData, updatedAt: new Date() };
+    
+    // Hash password if provided
+    if (userData.password) {
+      updateData.password = await bcrypt.hash(userData.password, 10);
+    }
+    
+    const [user] = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, id))
       .returning();
     return user;
   }
@@ -439,31 +484,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Vehicle handover operations
-  async createVehicleHandover(handoverData: {
-    orderId: string;
-    type: 'pickup' | 'delivery';
-    kmReading: string;
-    condition: 'excellent' | 'good' | 'fair' | 'poor';
-    damageNotes?: string;
-    notes?: string;
-    driverId: string;
-  }): Promise<any> {
-    // For now, store in a simple structure until we implement the full schema
-    const handover = {
-      id: crypto.randomUUID(),
-      orderId: handoverData.orderId,
-      type: handoverData.type,
-      kmReading: handoverData.kmReading,
-      condition: handoverData.condition,
-      damageNotes: handoverData.damageNotes || '',
-      notes: handoverData.notes || '',
-      driverId: handoverData.driverId,
-      createdAt: new Date(),
-    };
+  async createVehicleHandover(handover: InsertVehicleHandover): Promise<VehicleHandover> {
+    const [newHandover] = await db
+      .insert(vehicleHandovers)
+      .values(handover)
+      .returning();
+    return newHandover;
+  }
 
-    // In a real implementation, this would insert into the vehicleHandovers table
-    // For now, we'll simulate success
-    return handover;
+  async getHandoversByOrder(orderId: string): Promise<VehicleHandover[]> {
+    return await db
+      .select()
+      .from(vehicleHandovers)
+      .where(eq(vehicleHandovers.orderId, orderId))
+      .orderBy(desc(vehicleHandovers.handoverDateTime));
+  }
+
+  async getHandoversByDriver(driverId: string): Promise<VehicleHandover[]> {
+    return await db
+      .select()
+      .from(vehicleHandovers)
+      .where(eq(vehicleHandovers.driverId, driverId))
+      .orderBy(desc(vehicleHandovers.handoverDateTime));
   }
 
   // Update order status after handover

@@ -17,7 +17,7 @@ const userFormSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich"),
   lastName: z.string().min(1, "Nachname ist erforderlich"),
   password: z.string().min(6, "Passwort muss mindestens 6 Zeichen haben"),
-  role: z.enum(['admin', 'driver']),
+  role: z.enum(['admin', 'driver', 'disponent']),
   status: z.enum(['pending', 'active', 'inactive']),
 });
 
@@ -187,6 +187,9 @@ export function UserFormModal({ isOpen, onClose }: UserFormModalProps) {
                       </SelectItem>
                       <SelectItem value="admin" data-testid="option-role-admin">
                         Administrator
+                      </SelectItem>
+                      <SelectItem value="disponent" data-testid="option-role-disponent">
+                        Disponent
                       </SelectItem>
                     </SelectContent>
                   </Select>

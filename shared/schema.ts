@@ -329,5 +329,7 @@ export type Billing = typeof billings.$inferSelect;
 export type InsertBilling = z.infer<typeof insertBillingSchema>;
 export type VehicleHandover = typeof vehicleHandovers.$inferSelect;
 export type InsertVehicleHandover = z.infer<typeof insertVehicleHandoverSchema>;
+export type VehicleHandover = typeof vehicleHandovers.$inferSelect;
+export type InsertVehicleHandover = z.infer<typeof insertVehicleHandoverSchema>;
 export type OrderApproval = typeof orderApprovals.$inferSelect;
 export type InsertOrderApproval = z.infer<typeof insertOrderApprovalSchema>;

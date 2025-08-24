@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Camera, Car, Clock, MapPin, AlertTriangle, CheckCircle } from "lucide-react";
+import { Camera, Car, Clock, MapPin, AlertTriangle, CheckCircle, X, Upload } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Order } from "@shared/schema";
@@ -25,6 +25,7 @@ const handoverSchema = z.object({
   }),
   pickupNotes: z.string().optional(),
   deliveryNotes: z.string().optional(),
+  photos: z.array(z.instanceof(File)).optional(),
 });
 
 type HandoverFormData = z.infer<typeof handoverSchema>;
@@ -38,6 +39,9 @@ interface VehicleHandoverDialogProps {
 
 export function VehicleHandoverDialog({ isOpen, onClose, order, mode }: VehicleHandoverDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const form = useForm<HandoverFormData>({
@@ -53,9 +57,11 @@ export function VehicleHandoverDialog({ isOpen, onClose, order, mode }: VehicleH
   });
 
   const handoverMutation = useMutation({
-    mutationFn: async (data: HandoverFormData) => {
+    mutationFn: async (data: HandoverFormData & { photos?: File[] }) => {
+      // For now, we'll submit without photos until we implement file upload endpoint
+      const { photos: _, ...submitData } = data;
       return await apiRequest(`/api/orders/${order?.id}/handover`, "POST", {
-        ...data,
+        ...submitData,
         type: mode,
       });
     },
@@ -78,9 +84,54 @@ export function VehicleHandoverDialog({ isOpen, onClose, order, mode }: VehicleH
     },
   });
 
-  const onSubmit = (data: HandoverFormData) => {
-    handoverMutation.mutate(data);
+  // Photo handling functions
+  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    // Limit to max 6 photos
+    const currentPhotoCount = photos.length;
+    const maxNewPhotos = Math.max(0, 6 - currentPhotoCount);
+    const newFiles = files.slice(0, maxNewPhotos);
+
+    if (files.length > maxNewPhotos) {
+      toast({
+        title: "Maximale Anzahl erreicht",
+        description: "Sie können maximal 6 Fotos hochladen.",
+        variant: "destructive",
+      });
+    }
+
+    // Create preview URLs
+    const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
+    
+    setPhotos(prev => [...prev, ...newFiles]);
+    setPhotoPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    
+    // Reset input value
+    if (event.target) {
+      event.target.value = '';
+    }
   };
+
+  const removePhoto = (index: number) => {
+    // Revoke the URL to prevent memory leaks
+    URL.revokeObjectURL(photoPreviewUrls[index]);
+    
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const onSubmit = (data: HandoverFormData) => {
+    handoverMutation.mutate({ ...data, photos });
+  };
+
+  // Cleanup URLs when component unmounts
+  React.useEffect(() => {
+    return () => {
+      photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   const conditionLabels = {
     excellent: { label: "Ausgezeichnet", color: "bg-green-100 text-green-800" },
@@ -240,7 +291,7 @@ export function VehicleHandoverDialog({ isOpen, onClose, order, mode }: VehicleH
                 </CardContent>
               </Card>
 
-              {/* Photo Documentation Placeholder */}
+              {/* Photo Documentation */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -249,14 +300,56 @@ export function VehicleHandoverDialog({ isOpen, onClose, order, mode }: VehicleH
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <Camera className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
-                      Fotografieren Sie das Fahrzeug von mehreren Seiten
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Fotofunktion wird in einer zukünftigen Version verfügbar sein
-                    </p>
+                  <div className="space-y-4">
+                    {/* Upload Button */}
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        data-testid="input-photo-upload"
+                      />
+                      <Camera className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600 mb-2">
+                        Fotografieren Sie das Fahrzeug von mehreren Seiten
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="mt-2"
+                        data-testid="button-upload-photos"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Fotos hinzufügen
+                      </Button>
+                    </div>
+                    
+                    {/* Photo Previews */}
+                    {photoPreviewUrls.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {photoPreviewUrls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={url}
+                              alt={`Foto ${index + 1}`}
+                              className="w-full h-24 object-cover rounded-lg border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(index)}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              data-testid={`button-remove-photo-${index}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
