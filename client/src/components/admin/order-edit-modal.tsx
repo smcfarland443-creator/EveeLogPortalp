@@ -35,6 +35,7 @@ export function OrderEditModal({ isOpen, onClose, order }: OrderEditModalProps) 
   const { data: activeDrivers = [] } = useQuery<User[]>({
     queryKey: ["/api/drivers/active"],
     enabled: isOpen,
+    retry: false,
   });
   
   const form = useForm<OrderEditData>({
@@ -341,8 +342,8 @@ export function OrderEditModal({ isOpen, onClose, order }: OrderEditModalProps) 
                 <FormItem>
                   <FormLabel>Fahrer zuweisen</FormLabel>
                   <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value || ""}
+                    onValueChange={(value) => field.onChange(value === "none" ? undefined : value)} 
+                    value={field.value || "none"}
                   >
                     <FormControl>
                       <SelectTrigger data-testid="select-driver">
@@ -350,10 +351,10 @@ export function OrderEditModal({ isOpen, onClose, order }: OrderEditModalProps) 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="" data-testid="option-no-driver">
+                      <SelectItem value="none" data-testid="option-no-driver">
                         Kein Fahrer zugewiesen
                       </SelectItem>
-                      {activeDrivers.map((driver) => (
+                      {(activeDrivers || []).map((driver: User) => (
                         <SelectItem 
                           key={driver.id} 
                           value={driver.id}
