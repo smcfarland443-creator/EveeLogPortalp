@@ -88,10 +88,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const orderData = insertOrderSchema.parse({
+      // Transform date strings to Date objects
+      const transformedData = {
         ...req.body,
+        pickupDate: req.body.pickupDate ? new Date(req.body.pickupDate) : undefined,
+        deliveryDate: req.body.deliveryDate ? new Date(req.body.deliveryDate) : undefined,
         createdById: req.user.claims.sub,
-      });
+      };
+
+      const orderData = insertOrderSchema.parse(transformedData);
       
       const order = await storage.createOrder(orderData);
       res.json(order);
@@ -165,10 +170,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const auctionData = insertAuctionSchema.parse({
+      // Transform date strings to Date objects
+      const transformedData = {
         ...req.body,
+        pickupDate: req.body.pickupDate ? new Date(req.body.pickupDate) : undefined,
+        deliveryDate: req.body.deliveryDate ? new Date(req.body.deliveryDate) : undefined,
         createdById: req.user.claims.sub,
-      });
+      };
+
+      const auctionData = insertAuctionSchema.parse(transformedData);
       
       const auction = await storage.createAuction(auctionData);
       res.json(auction);
