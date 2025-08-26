@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Clock } from "lucide-react";
 import { z } from "zod";
 
 const orderFormSchema = insertOrderSchema.extend({
@@ -55,9 +54,6 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
       assignedDriverId: undefined,
     },
   });
-  
-  
-  
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: OrderFormData) => {
@@ -220,7 +216,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                     <FormLabel>Abholtermin</FormLabel>
                     <FormControl>
                       <Input 
-                        type="datetime-local" 
+                        type="date" 
                         {...field} 
                         data-testid="input-pickup-date"
                       />
@@ -238,7 +234,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                     <FormLabel>Liefertermin</FormLabel>
                     <FormControl>
                       <Input 
-                        type="datetime-local" 
+                        type="date" 
                         {...field}
                         value={field.value || ""}
                         data-testid="input-delivery-date"
@@ -276,20 +272,14 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                 name="distance"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      Entfernung (km)
-                    </FormLabel>
+                    <FormLabel>Entfernung (km)</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
                         placeholder="280" 
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => {
-                          const value = e.target.value ? parseInt(e.target.value) : undefined;
-                          field.onChange(value);
-                        }}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                         data-testid="input-distance"
                       />
                     </FormControl>

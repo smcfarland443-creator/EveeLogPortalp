@@ -40,8 +40,6 @@ export const auctionStatusEnum = pgEnum('auction_status', ['active', 'sold', 'ca
 
 // Billing status enum
 export const billingStatusEnum = pgEnum('billing_status', ['pending', 'approved', 'rejected', 'paid', 'cancelled']);
-export const vehicleTypeEnum = pgEnum('vehicle_type', ['Transporter', 'PKW', 'LKW', 'Motorrad', 'Wohnmobil', 'Andere']);
-export const transportTypeEnum = pgEnum('transport_type', ['Aussteuerung', 'Rückholung', 'Umzug', 'Service', 'Verkauf', 'Andere']);
 
 // Billing type enum
 export const billingTypeEnum = pgEnum('billing_type', ['order_payment', 'cancellation_fee', 'credit', 'debit', 'completion_payment']);
@@ -67,38 +65,20 @@ export const users = pgTable("users", {
 // Orders table
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  // Basic route information
   pickupLocation: varchar("pickup_location").notNull(),
   deliveryLocation: varchar("delivery_location").notNull(),
-  
-  // Professional transport details
-  vehicleType: vehicleTypeEnum("vehicle_type").notNull().default('Transporter'),
-  transportType: transportTypeEnum("transport_type").notNull().default('Aussteuerung'),
   vehicleBrand: varchar("vehicle_brand").notNull(),
   vehicleModel: varchar("vehicle_model").notNull(),
   vehicleYear: integer("vehicle_year"),
-  
-  // Time windows (professional format)
   pickupDate: timestamp("pickup_date").notNull(),
   deliveryDate: timestamp("delivery_date"),
   pickupTimeFrom: varchar("pickup_time_from"), // e.g., "08:00"
   pickupTimeTo: varchar("pickup_time_to"), // e.g., "14:00"
   deliveryTimeFrom: varchar("delivery_time_from"),
   deliveryTimeTo: varchar("delivery_time_to"),
-  
-  // Customer and pricing
-  customerName: varchar("customer_name"),
-  customerContact: varchar("customer_contact"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  distance: integer("distance"), // in km (auto-calculated or manual)
-  manualDistance: varchar("manual_distance").default('false'), // 'true' if manually entered
-  
-  // Additional professional fields
-  transportInstructions: text("transport_instructions"), // Special handling notes
-  documents: text("documents").array().default(sql`ARRAY[]::text[]`), // Required documents
+  distance: integer("distance"), // in km
   notes: text("notes"),
-  
-  // Status and assignment
   status: orderStatusEnum("status").notNull().default('open'),
   assignedDriverId: varchar("assigned_driver_id").references(() => users.id),
   createdById: varchar("created_by_id").notNull().references(() => users.id),
@@ -110,38 +90,20 @@ export const orders = pgTable("orders", {
 // Auctions table
 export const auctions = pgTable("auctions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  // Basic route information
   pickupLocation: varchar("pickup_location").notNull(),
   deliveryLocation: varchar("delivery_location").notNull(),
-  
-  // Professional transport details
-  vehicleType: vehicleTypeEnum("vehicle_type").notNull().default('Transporter'),
-  transportType: transportTypeEnum("transport_type").notNull().default('Aussteuerung'),
   vehicleBrand: varchar("vehicle_brand").notNull(),
   vehicleModel: varchar("vehicle_model").notNull(),
   vehicleYear: integer("vehicle_year"),
-  
-  // Time windows (mandatory for auctions)
   pickupDate: timestamp("pickup_date").notNull(),
   deliveryDate: timestamp("delivery_date"),
-  pickupTimeFrom: varchar("pickup_time_from").notNull(), // mandatory for auctions
-  pickupTimeTo: varchar("pickup_time_to").notNull(), // mandatory for auctions
-  deliveryTimeFrom: varchar("delivery_time_from").notNull(), // mandatory for auctions
-  deliveryTimeTo: varchar("delivery_time_to").notNull(), // mandatory for auctions
-  
-  // Customer and pricing
-  customerName: varchar("customer_name"),
-  customerContact: varchar("customer_contact"),
+  pickupTimeFrom: varchar("pickup_time_from"), // mandatory for auctions
+  pickupTimeTo: varchar("pickup_time_to"), // mandatory for auctions
+  deliveryTimeFrom: varchar("delivery_time_from"), // mandatory for auctions
+  deliveryTimeTo: varchar("delivery_time_to"), // mandatory for auctions
   instantPrice: decimal("instant_price", { precision: 10, scale: 2 }).notNull(),
-  distance: integer("distance"), // in km (auto-calculated or manual)
-  manualDistance: varchar("manual_distance").default('false'), // 'true' if manually entered
-  
-  // Additional professional fields
-  transportInstructions: text("transport_instructions"), // Special handling notes
-  documents: text("documents").array().default(sql`ARRAY[]::text[]`), // Required documents
+  distance: integer("distance"), // in km
   notes: text("notes"),
-  
-  // Status and purchase tracking
   status: auctionStatusEnum("status").notNull().default('active'),
   purchasedById: varchar("purchased_by_id").references(() => users.id),
   purchasedAt: timestamp("purchased_at"),

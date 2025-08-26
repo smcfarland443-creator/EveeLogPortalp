@@ -51,8 +51,15 @@ export function AuctionFormModal({ isOpen, onClose }: AuctionFormModalProps) {
   });
 
   const createAuctionMutation = useMutation({
-    mutationFn: async (data: any) => {
-      await apiRequest("POST", "/api/auctions", data);
+    mutationFn: async (data: AuctionFormData) => {
+      const auctionData = {
+        ...data,
+        pickupDate: new Date(data.pickupDate),
+        deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : undefined,
+        instantPrice: data.instantPrice.toString(),
+      };
+      
+      await apiRequest("POST", "/api/auctions", auctionData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auctions"] });
@@ -81,16 +88,7 @@ export function AuctionFormModal({ isOpen, onClose }: AuctionFormModalProps) {
   });
 
   const onSubmit = (data: AuctionFormData) => {
-    // Prepare the data for API with proper type conversion
-    const auctionData = {
-      ...data,
-      pickupDate: new Date(data.pickupDate),
-      deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : undefined,
-      instantPrice: data.instantPrice.toString(),
-      vehicleYear: data.vehicleYear ? Number(data.vehicleYear) : undefined,
-    };
-    
-    createAuctionMutation.mutate(auctionData);
+    createAuctionMutation.mutate(data);
   };
 
   const handleClose = () => {
@@ -213,7 +211,7 @@ export function AuctionFormModal({ isOpen, onClose }: AuctionFormModalProps) {
                     <FormLabel>Abholtermin</FormLabel>
                     <FormControl>
                       <Input 
-                        type="datetime-local" 
+                        type="date" 
                         {...field} 
                         data-testid="input-pickup-date"
                       />
@@ -231,7 +229,7 @@ export function AuctionFormModal({ isOpen, onClose }: AuctionFormModalProps) {
                     <FormLabel>Liefertermin</FormLabel>
                     <FormControl>
                       <Input 
-                        type="datetime-local" 
+                        type="date" 
                         {...field}
                         value={field.value || ""}
                         data-testid="input-delivery-date"

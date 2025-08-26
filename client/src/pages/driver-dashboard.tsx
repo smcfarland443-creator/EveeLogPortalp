@@ -8,12 +8,10 @@ import { Navigation } from "@/components/layout/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AuctionCard } from "@/components/driver/auction-card";
 import { AuctionPurchaseDialog } from "@/components/driver/auction-purchase-dialog";
 import { VehicleHandoverDialog } from "@/components/driver/vehicle-handover-dialog";
-import { Car, CheckCircle, Filter, Search } from "lucide-react";
+import { Car, CheckCircle } from "lucide-react";
 import type { Order, Auction } from "@shared/schema";
 
 type ViewType = 'dashboard' | 'orders' | 'auctions' | 'billing' | 'history';
@@ -25,13 +23,6 @@ export default function DriverDashboard() {
   const [isHandoverDialogOpen, setIsHandoverDialogOpen] = useState(false);
   const [handoverMode, setHandoverMode] = useState<'pickup' | 'delivery'>('pickup');
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
-  
-  // Filter states
-  const [priceFilter, setPriceFilter] = useState({ min: '', max: '' });
-  const [locationFilter, setLocationFilter] = useState('');
-  const [vehicleTypeFilter, setVehicleTypeFilter] = useState('');
-  const [transportTypeFilter, setTransportTypeFilter] = useState('');
-  const [sortBy, setSortBy] = useState('price');
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
 
@@ -69,59 +60,6 @@ export default function DriverDashboard() {
   // Type assertions for data
   const typedOrders = orders as Order[];
   const typedAuctions = auctions as Auction[];
-  
-  // Filter and sort auctions
-  const filteredAndSortedAuctions = typedAuctions
-    .filter(auction => {
-      // Price filter
-      if (priceFilter.min && parseFloat(auction.instantPrice) < parseFloat(priceFilter.min)) return false;
-      if (priceFilter.max && parseFloat(auction.instantPrice) > parseFloat(priceFilter.max)) return false;
-      
-      // Location filter
-      if (locationFilter) {
-        const locationMatch = 
-          auction.pickupLocation.toLowerCase().includes(locationFilter.toLowerCase()) ||
-          auction.deliveryLocation.toLowerCase().includes(locationFilter.toLowerCase());
-        if (!locationMatch) return false;
-      }
-      
-      // Vehicle type filter
-      if (vehicleTypeFilter && !auction.vehicleBrand.toLowerCase().includes(vehicleTypeFilter.toLowerCase()) &&
-          !auction.vehicleModel.toLowerCase().includes(vehicleTypeFilter.toLowerCase())) {
-        return false;
-      }
-      
-      // Transport type filter (using status as proxy for transport type)
-      if (transportTypeFilter && auction.status !== transportTypeFilter) {
-        return false;
-      }
-      
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'price-asc':
-          return parseFloat(a.instantPrice) - parseFloat(b.instantPrice);
-        case 'price-desc':
-          return parseFloat(b.instantPrice) - parseFloat(a.instantPrice);
-        case 'distance':
-          return parseInt(a.distance) - parseInt(b.distance);
-        case 'pickup':
-          return a.pickupLocation.localeCompare(b.pickupLocation);
-        case 'delivery':
-          return a.deliveryLocation.localeCompare(b.deliveryLocation);
-        default:
-          return parseFloat(a.instantPrice) - parseFloat(b.instantPrice);
-      }
-    });
-    
-  const clearFilters = () => {
-    setPriceFilter({ min: '', max: '' });
-    setLocationFilter('');
-    setVehicleTypeFilter('');
-    setTransportTypeFilter('');
-    setSortBy('price');
-  };
 
   // Mutations
   const markCompletedMutation = useMutation({
@@ -559,106 +497,17 @@ export default function DriverDashboard() {
         <p className="text-gray-600">Verfügbare Sofortkauf-Aufträge</p>
       </div>
 
-      {/* Filter Section */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filter & Sortierung
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {/* Price Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Preis (€)</label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  placeholder="Min"
-                  value={priceFilter.min}
-                  onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
-                  className="w-20"
-                  data-testid="filter-price-min"
-                />
-                <span className="self-center">-</span>
-                <Input
-                  type="number"
-                  placeholder="Max"
-                  value={priceFilter.max}
-                  onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
-                  className="w-20"
-                  data-testid="filter-price-max"
-                />
-              </div>
-            </div>
-
-            {/* Location Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Ort</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Stadt oder PLZ"
-                  value={locationFilter}
-                  onChange={(e) => setLocationFilter(e.target.value)}
-                  className="pl-10"
-                  data-testid="filter-location"
-                />
-              </div>
-            </div>
-
-            {/* Vehicle Type Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Fahrzeugtyp</label>
-              <Input
-                placeholder="z.B. BMW, Transporter"
-                value={vehicleTypeFilter}
-                onChange={(e) => setVehicleTypeFilter(e.target.value)}
-                data-testid="filter-vehicle-type"
-              />
-            </div>
-
-            {/* Sort By */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Sortieren nach</label>
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger data-testid="sort-by">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="price-asc">Preis aufsteigend</SelectItem>
-                  <SelectItem value="price-desc">Preis absteigend</SelectItem>
-                  <SelectItem value="distance">Entfernung</SelectItem>
-                  <SelectItem value="pickup">Abholort</SelectItem>
-                  <SelectItem value="delivery">Zielort</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              {filteredAndSortedAuctions.length} von {typedAuctions.length} Auktionen
-            </div>
-            <Button variant="outline" size="sm" onClick={clearFilters} data-testid="clear-filters">
-              Filter zurücksetzen
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {auctionsLoading ? (
           <div className="col-span-full flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
           </div>
-        ) : filteredAndSortedAuctions.length === 0 ? (
+        ) : typedAuctions.length === 0 ? (
           <div className="col-span-full text-center py-8 text-gray-500">
-            {typedAuctions.length === 0 ? 'Keine Auktionen verfügbar' : 'Keine Auktionen entsprechen den Filterkriterien'}
+            Keine Auktionen verfügbar
           </div>
         ) : (
-          filteredAndSortedAuctions.map((auction: Auction) => (
+          typedAuctions.map((auction: Auction) => (
             <AuctionCard
               key={auction.id}
               auction={auction}
