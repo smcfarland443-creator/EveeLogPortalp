@@ -22,6 +22,7 @@ const orderFormSchema = insertOrderSchema.extend({
   pickupTimeTo: z.string().optional(),
   deliveryTimeFrom: z.string().optional(),
   deliveryTimeTo: z.string().optional(),
+  vehicleCount: z.number().min(1, "Mindestens 1 Fahrzeug erforderlich").max(50, "Maximal 50 Fahrzeuge pro Auftrag").optional(),
 }).omit({ createdById: true });
 
 type OrderFormData = z.infer<typeof orderFormSchema>;
@@ -55,6 +56,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
       pickupTimeTo: "",
       deliveryTimeFrom: "",
       deliveryTimeTo: "",
+      vehicleCount: 1,
       price: "",
       distance: undefined,
       notes: "",
@@ -72,11 +74,23 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
         price: data.price.toString(),
       };
       
-      await apiRequest("POST", "/api/orders", orderData);
+      const vehicleCount = data.vehicleCount || 1;
+      
+      // Erstelle mehrere Aufträge wenn Anzahl > 1
+      const promises = [];
+      for (let i = 0; i < vehicleCount; i++) {
+        promises.push(apiRequest("POST", "/api/orders", orderData));
+      }
+      
+      await Promise.all(promises);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({ title: "Success", description: "Order created successfully" });
+      const count = variables.vehicleCount || 1;
+      const message = count === 1 
+        ? "Auftrag erfolgreich erstellt" 
+        : `${count} Aufträge erfolgreich erstellt`;
+      toast({ title: "Erfolg", description: message });
       onClose();
       form.reset();
     },
@@ -194,7 +208,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <FormField
                 control={form.control}
                 name="vehicleYear"
@@ -209,6 +223,29 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                         value={field.value || ""}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                         data-testid="input-vehicle-year"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="vehicleCount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Anzahl Fahrzeuge</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1"
+                        max="50"
+                        placeholder="1" 
+                        {...field}
+                        value={field.value || 1}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 1)}
+                        data-testid="input-vehicle-count"
                       />
                     </FormControl>
                     <FormMessage />

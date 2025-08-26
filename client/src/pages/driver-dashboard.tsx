@@ -475,10 +475,10 @@ export default function DriverDashboard() {
                   
                   {order.status === 'in_progress' && (
                     <Button 
-                      onClick={() => updateOrderStatusMutation.mutate({ orderId: order.id, status: 'delivered' })}
+                      onClick={() => markDeliveredMutation.mutate(order.id)}
                       size="sm"
                       className="bg-green-600 hover:bg-green-700"
-                      disabled={updateOrderStatusMutation.isPending}
+                      disabled={markDeliveredMutation.isPending}
                       data-testid={`button-delivery-${order.id}`}
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
