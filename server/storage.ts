@@ -535,6 +535,23 @@ export class DatabaseStorage implements IStorage {
     
     return order;
   }
+
+  // Get handovers by order ID (admin)
+  async getHandoversByOrderId(orderId: string): Promise<VehicleHandover[]> {
+    return await db
+      .select()
+      .from(vehicleHandovers)
+      .where(eq(vehicleHandovers.orderId, orderId))
+      .orderBy(desc(vehicleHandovers.handoverDateTime));
+  }
+
+  // Get all handovers (admin)
+  async getAllHandovers(): Promise<VehicleHandover[]> {
+    return await db
+      .select()
+      .from(vehicleHandovers)
+      .orderBy(desc(vehicleHandovers.handoverDateTime));
+  }
 }
 
 export const storage = new DatabaseStorage();

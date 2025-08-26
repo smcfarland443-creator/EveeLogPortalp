@@ -133,12 +133,15 @@ export default function AdminBilling() {
       </div>
 
       <Tabs defaultValue="pending-orders" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="pending-orders" data-testid="tab-pending-orders">
             Abgeschlossene Aufträge ({pendingOrders.length})
           </TabsTrigger>
           <TabsTrigger value="approvals" data-testid="tab-approvals">
-            Genehmigungen ({pendingBillings.length})
+            Vergütungen ({pendingBillings.filter(b => b.type === 'completion_payment').length})
+          </TabsTrigger>
+          <TabsTrigger value="auction-payments" data-testid="tab-auction-payments">
+            Auktionskäufe ({pendingBillings.filter(b => b.type === 'order_payment').length})
           </TabsTrigger>
         </TabsList>
 
@@ -222,8 +225,8 @@ export default function AdminBilling() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                Abrechnungen zur Genehmigung
+                <Euro className="h-5 w-5" />
+                Fahrerabrechnung - Vergütungen
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -231,13 +234,13 @@ export default function AdminBilling() {
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
                 </div>
-              ) : pendingBillings.length === 0 ? (
+              ) : pendingBillings.filter(b => b.type === 'completion_payment').length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  Keine Abrechnungen zur Genehmigung vorhanden
+                  Keine Vergütungen zur Genehmigung vorhanden
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {pendingBillings.map((billing: Billing) => (
+                  {pendingBillings.filter((billing: Billing) => billing.type === 'completion_payment').map((billing: Billing) => (
                     <div
                       key={billing.id}
                       className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
@@ -284,6 +287,85 @@ export default function AdminBilling() {
                           data-testid={`button-approve-billing-${billing.id}`}
                         >
                           Genehmigen
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="auction-payments" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Auktionszahlungen zur Genehmigung
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {billingsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                </div>
+              ) : pendingBillings.filter(b => b.type === 'order_payment').length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Keine Auktionszahlungen zur Genehmigung vorhanden
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingBillings.filter((billing: Billing) => billing.type === 'order_payment').map((billing: Billing) => (
+                    <div
+                      key={billing.id}
+                      className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="font-medium text-gray-900">
+                            {billing.description}
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            Erstellt am {new Date(billing.createdAt!).toLocaleDateString('de-DE')}
+                          </p>
+                        </div>
+                        {getStatusBadge(billing.status)}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4">
+                        <div>
+                          <span className="text-gray-600 block">Betrag:</span>
+                          <span className="text-gray-900 font-medium">€{billing.amount}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 block">Typ:</span>
+                          <span className="text-gray-900">{billing.type === 'order_payment' ? 'Auktionskauf' : billing.type}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 block">Fahrer-ID:</span>
+                          <span className="text-gray-900 font-mono text-xs">{billing.userId}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2">
+                        <Button
+                          onClick={() => handleApproveBilling(billing, 'approved')}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          size="sm"
+                          data-testid={`button-approve-${billing.id}`}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Genehmigen
+                        </Button>
+                        <Button
+                          onClick={() => handleApproveBilling(billing, 'rejected')}
+                          variant="destructive"
+                          size="sm"
+                          data-testid={`button-reject-${billing.id}`}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Ablehnen
                         </Button>
                       </div>
                     </div>

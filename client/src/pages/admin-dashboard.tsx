@@ -13,6 +13,7 @@ import { OrderFormModal } from "@/components/admin/order-form-modal";
 import { OrderEditModal } from "@/components/admin/order-edit-modal";
 import { AuctionFormModal } from "@/components/admin/auction-form-modal";
 import { UserFormModal } from "@/components/admin/user-form-modal";
+import { HandoverDetailsModal } from "@/components/admin/handover-details-modal";
 import AdminBilling from "@/pages/admin-billing";
 import type { User, Order, Auction } from "@shared/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -48,6 +49,8 @@ export default function AdminDashboard() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
+  const [selectedOrderForHandover, setSelectedOrderForHandover] = useState<Order | null>(null);
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
 
@@ -499,8 +502,22 @@ export default function AdminDashboard() {
                           onClick={() => handleEditOrder(order)}
                           data-testid={`button-edit-order-${order.id}`}
                         >
-                          Bearbeiten
+                          <i className="fas fa-edit mr-1"></i>Bearbeiten
                         </Button>
+                        {(order.status === 'in_progress' || order.status === 'completed') && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-green-600 hover:text-green-900"
+                            onClick={() => {
+                              setSelectedOrderForHandover(order);
+                              setShowHandoverModal(true);
+                            }}
+                            data-testid={`button-view-handover-${order.id}`}
+                          >
+                            <i className="fas fa-clipboard-check mr-1"></i>Übergabe
+                          </Button>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="sm"
@@ -509,7 +526,7 @@ export default function AdminDashboard() {
                           disabled={deleteOrderMutation.isPending}
                           data-testid={`button-delete-order-${order.id}`}
                         >
-                          Löschen
+                          <i className="fas fa-trash mr-1"></i>Löschen
                         </Button>
                       </div>
                     </TableCell>
@@ -960,6 +977,15 @@ export default function AdminDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <HandoverDetailsModal 
+        isOpen={showHandoverModal}
+        onClose={() => {
+          setShowHandoverModal(false);
+          setSelectedOrderForHandover(null);
+        }}
+        order={selectedOrderForHandover}
+      />
     </div>
   );
 }

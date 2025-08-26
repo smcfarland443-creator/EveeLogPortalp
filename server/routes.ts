@@ -422,33 +422,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Purchase auction (driver)
-  app.post('/api/auctions/:id/purchase', isAuthenticated, async (req: any, res) => {
-    try {
-      const currentUser = await storage.getUser(req.user.claims.sub);
-      if (currentUser?.role !== 'driver') {
-        return res.status(403).json({ message: "Only drivers can purchase auctions" });
-      }
-
-      if (currentUser.status !== 'active') {
-        return res.status(403).json({ message: "Account must be active to purchase auctions" });
-      }
-
-      const result = await storage.purchaseAuction(req.params.id, req.user.claims.sub);
-      if (!result) {
-        return res.status(404).json({ message: "Auction not found or already sold" });
-      }
-
-      res.json({ 
-        message: "Auction purchased successfully and order created",
-        auction: result.auction,
-        order: result.order
-      });
-    } catch (error) {
-      console.error("Error purchasing auction:", error);
-      res.status(500).json({ message: "Failed to purchase auction" });
-    }
-  });
 
   // Get billing data
   app.get('/api/billing', isAuthenticated, async (req: any, res) => {
@@ -617,6 +590,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching handovers:', error);
       res.status(500).json({ message: 'Failed to fetch handovers' });
+    }
+  });
+
+  // Get handovers for an order (admin only)
+  app.get('/api/admin/orders/:id/handovers', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const handovers = await storage.getHandoversByOrderId(req.params.id);
+      res.json(handovers);
+    } catch (error) {
+      console.error("Error fetching handovers:", error);
+      res.status(500).json({ message: "Failed to fetch handovers" });
+    }
+  });
+
+  // Get all handovers (admin only)
+  app.get('/api/admin/handovers', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const handovers = await storage.getAllHandovers();
+      res.json(handovers);
+    } catch (error) {
+      console.error("Error fetching all handovers:", error);
+      res.status(500).json({ message: "Failed to fetch handovers" });
     }
   });
 
