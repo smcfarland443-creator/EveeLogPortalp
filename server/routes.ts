@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { calculateDistance } from "./lib/googlemaps";
 import { insertOrderSchema, insertAuctionSchema, insertUserSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -622,6 +623,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching all handovers:", error);
       res.status(500).json({ message: "Failed to fetch handovers" });
+    }
+  });
+
+  // Google Maps distance calculation endpoint
+  app.post('/api/calculate-distance', isAuthenticated, async (req: any, res) => {
+    try {
+      const { origin, destination } = req.body;
+      
+      if (!origin || !destination) {
+        return res.status(400).json({ message: 'Origin and destination are required' });
+      }
+      
+      const result = await calculateDistance(origin, destination);
+      res.json(result);
+    } catch (error) {
+      console.error('Distance calculation error:', error);
+      res.status(500).json({ message: 'Failed to calculate distance' });
     }
   });
 

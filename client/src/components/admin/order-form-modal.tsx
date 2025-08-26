@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Calculator, Clock } from "lucide-react";
 import { z } from "zod";
 
 const orderFormSchema = insertOrderSchema.extend({
@@ -29,6 +31,8 @@ interface OrderFormModalProps {
 
 export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
   const { toast } = useToast();
+  const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
+  const [autoCalculatedDistance, setAutoCalculatedDistance] = useState<number | null>(null);
   
   // Fetch active drivers for assignment
   const { data: activeDrivers = [] } = useQuery<User[]>({
@@ -54,6 +58,70 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
       assignedDriverId: undefined,
     },
   });
+  
+  // Auto-calculate distance when locations change
+  const calculateDistanceMutation = useMutation({
+    mutationFn: async ({ origin, destination }: { origin: string; destination: string }) => {
+      return await apiRequest("POST", "/api/calculate-distance", { origin, destination });
+    },
+    onSuccess: (result: any) => {
+      if (result.status === 'OK' && result.distance > 0) {
+        setAutoCalculatedDistance(result.distance);
+        form.setValue('distance', result.distance);
+        toast({
+          title: "Entfernung berechnet",
+          description: `Automatisch berechnete Entfernung: ${result.distance} km`,
+        });
+      } else {
+        toast({
+          title: "Warnung",
+          description: "Entfernung konnte nicht automatisch berechnet werden",
+          variant: "destructive",
+        });
+      }
+      setIsCalculatingDistance(false);
+    },
+    onError: () => {
+      toast({
+        title: "Fehler",
+        description: "Entfernung konnte nicht berechnet werden",
+        variant: "destructive",
+      });
+      setIsCalculatingDistance(false);
+    },
+  });
+  
+  // Auto-calculate distance when both locations are filled
+  useEffect(() => {
+    const pickup = form.watch('pickupLocation');
+    const delivery = form.watch('deliveryLocation');
+    
+    if (pickup && delivery && pickup.trim() && delivery.trim() && pickup !== delivery) {
+      const timer = setTimeout(() => {
+        setIsCalculatingDistance(true);
+        calculateDistanceMutation.mutate({ origin: pickup, destination: delivery });
+      }, 1000); // Debounce for 1 second
+      
+      return () => clearTimeout(timer);
+    }
+  }, [form.watch('pickupLocation'), form.watch('deliveryLocation')]);
+  
+  const manuallyCalculateDistance = () => {
+    const pickup = form.getValues('pickupLocation');
+    const delivery = form.getValues('deliveryLocation');
+    
+    if (!pickup || !delivery) {
+      toast({
+        title: "Fehler",
+        description: "Bitte geben Sie zuerst Abhol- und Lieferort ein",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsCalculatingDistance(true);
+    calculateDistanceMutation.mutate({ origin: pickup, destination: delivery });
+  };
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: OrderFormData) => {
@@ -272,17 +340,49 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                 name="distance"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Entfernung (km)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="280" 
-                        {...field}
-                        value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                        data-testid="input-distance"
-                      />
-                    </FormControl>
+                    <FormLabel className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Entfernung (km)
+                      {autoCalculatedDistance && (
+                        <Badge variant="secondary" className="text-xs">
+                          Auto-berechnet
+                        </Badge>
+                      )}
+                    </FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="280" 
+                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseInt(e.target.value) : undefined;
+                            field.onChange(value);
+                            if (value) setAutoCalculatedDistance(null); // Mark as manually entered
+                          }}
+                          data-testid="input-distance"
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={manuallyCalculateDistance}
+                        disabled={isCalculatingDistance}
+                        className="flex-shrink-0"
+                        data-testid="button-calculate-distance"
+                      >
+                        {isCalculatingDistance ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        ) : (
+                          <Calculator className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      Entfernung wird automatisch berechnet oder kann manuell eingegeben werden
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
