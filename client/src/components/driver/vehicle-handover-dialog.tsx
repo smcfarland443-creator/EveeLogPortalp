@@ -228,6 +228,7 @@ export function VehicleHandoverDialog({ isOpen, onClose, order, mode }: VehicleH
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                               data-testid="select-condition"
                             >
+                              <option value="">Fahrzeugzustand auswählen</option>
                               {Object.entries(conditionLabels).map(([value, config]) => (
                                 <option key={value} value={value}>
                                   {config.label}
