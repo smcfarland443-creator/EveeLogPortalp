@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ import type { Order } from "@shared/schema";
 const handoverFormSchema = z.object({
   kmReading: z.number().min(0, "KM-Stand muss positiv sein"),
   fuelLevel: z.string().min(1, "Tankstand ist erforderlich"),
-  location: z.string().min(1, "Standort ist erforderlich"),
+  location: z.string(), // Removed .min(1) since it's auto-filled
   vehicleCondition: z.string().optional(),
   damageNotes: z.string().optional(),
 });
@@ -39,11 +39,19 @@ export function HandoverFormModal({ isOpen, onClose, order, mode }: HandoverForm
     defaultValues: {
       kmReading: 0,
       fuelLevel: "",
-      location: mode === 'pickup' ? order?.pickupLocation || "" : order?.deliveryLocation || "",
+      location: "",
       vehicleCondition: "",
       damageNotes: "",
     },
   });
+
+  // Auto-fill location when component opens or mode/order changes
+  React.useEffect(() => {
+    if (order && isOpen) {
+      const autoLocation = mode === 'pickup' ? order.pickupLocation : order.deliveryLocation;
+      form.setValue('location', autoLocation);
+    }
+  }, [order, mode, isOpen, form]);
 
   const submitHandoverMutation = useMutation({
     mutationFn: async (data: HandoverFormData) => {
