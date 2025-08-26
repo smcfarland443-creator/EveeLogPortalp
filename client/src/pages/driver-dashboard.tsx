@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { AuctionCard } from "@/components/driver/auction-card";
 import { AuctionPurchaseDialog } from "@/components/driver/auction-purchase-dialog";
 import { VehicleHandoverDialog } from "@/components/driver/vehicle-handover-dialog";
+import { HandoverFormModal } from "@/components/driver/handover-form-modal";
 import { Car, CheckCircle } from "lucide-react";
 import type { Order, Auction } from "@shared/schema";
 
@@ -21,6 +22,7 @@ export default function DriverDashboard() {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isHandoverDialogOpen, setIsHandoverDialogOpen] = useState(false);
+  const [isHandoverFormOpen, setIsHandoverFormOpen] = useState(false);
   const [handoverMode, setHandoverMode] = useState<'pickup' | 'delivery'>('pickup');
   const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -106,6 +108,11 @@ export default function DriverDashboard() {
   const handleCloseHandoverDialog = () => {
     setSelectedOrder(null);
     setIsHandoverDialogOpen(false);
+  };
+
+  const handleCloseHandoverForm = () => {
+    setSelectedOrder(null);
+    setIsHandoverFormOpen(false);
   };
 
   const acceptOrderMutation = useMutation({
@@ -463,7 +470,7 @@ export default function DriverDashboard() {
                       onClick={() => {
                         setSelectedOrder(order);
                         setHandoverMode('pickup');
-                        setIsHandoverDialogOpen(true);
+                        setIsHandoverFormOpen(true);
                       }}
                       size="sm"
                       data-testid={`button-pickup-${order.id}`}
@@ -475,10 +482,13 @@ export default function DriverDashboard() {
                   
                   {order.status === 'in_progress' && (
                     <Button 
-                      onClick={() => markDeliveredMutation.mutate(order.id)}
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setHandoverMode('delivery');
+                        setIsHandoverFormOpen(true);
+                      }}
                       size="sm"
                       className="bg-green-600 hover:bg-green-700"
-                      disabled={markDeliveredMutation.isPending}
                       data-testid={`button-delivery-${order.id}`}
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
@@ -679,6 +689,14 @@ export default function DriverDashboard() {
       <VehicleHandoverDialog
         isOpen={isHandoverDialogOpen}
         onClose={handleCloseHandoverDialog}
+        order={selectedOrder}
+        mode={handoverMode}
+      />
+      
+      {/* Handover Form Modal */}
+      <HandoverFormModal
+        isOpen={isHandoverFormOpen}
+        onClose={handleCloseHandoverForm}
         order={selectedOrder}
         mode={handoverMode}
       />

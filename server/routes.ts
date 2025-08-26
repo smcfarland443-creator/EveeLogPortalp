@@ -302,6 +302,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Handover protocol routes
+  app.post('/api/orders/:id/handovers', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'driver') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const handoverData = {
+        ...req.body,
+        orderId: req.params.id,
+        driverId: req.user.claims.sub,
+      };
+      
+      const handover = await storage.createHandover(handoverData);
+      res.json(handover);
+    } catch (error) {
+      console.error("Error creating handover:", error);
+      res.status(500).json({ message: "Failed to create handover protocol" });
+    }
+  });
+
   app.delete('/api/orders/:id', isAuthenticated, async (req: any, res) => {
     try {
       const currentUser = await storage.getUser(req.user.claims.sub);

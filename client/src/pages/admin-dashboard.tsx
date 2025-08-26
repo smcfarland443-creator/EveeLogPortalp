@@ -445,101 +445,105 @@ export default function AdminDashboard() {
         </Button>
       </div>
 
-      <Card>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Auftrag</TableHead>
-                <TableHead>Route</TableHead>
-                <TableHead>Fahrzeug</TableHead>
-                <TableHead>Fahrer</TableHead>
-                <TableHead>Preis</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Aktionen</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ordersLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
-                  </TableCell>
-                </TableRow>
-              ) : orders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                    Keine Aufträge vorhanden
-                  </TableCell>
-                </TableRow>
-              ) : (
-                orders.map((order: Order) => (
-                  <TableRow key={order.id}>
-                    <TableCell>
-                      <div className="text-sm font-medium text-gray-900">#{order.id.slice(-4)}</div>
-                      <div className="text-sm text-gray-500">
+      {/* Mobile-responsive Cards instead of Table */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {ordersLoading ? (
+          <div className="col-span-full flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="col-span-full text-center py-8 text-gray-500">
+            Keine Aufträge vorhanden
+          </div>
+        ) : (
+          orders.map((order: Order) => (
+            <Card key={order.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <i className="fas fa-truck text-blue-600"></i>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="font-semibold text-gray-900">Auftrag #{order.id.slice(-4)}</h3>
+                      <p className="text-sm text-gray-600">
                         Erstellt: {new Date(order.createdAt!).toLocaleDateString('de-DE')}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-900">{order.pickupLocation} → {order.deliveryLocation}</div>
-                      <div className="text-sm text-gray-500">{order.distance} km</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-900">{order.vehicleBrand} {order.vehicleModel}</div>
-                      <div className="text-sm text-gray-500">{order.vehicleYear && `Bj. ${order.vehicleYear}`}</div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-gray-500">
-                        {order.assignedDriverId ? 'Zugewiesen' : 'Nicht zugewiesen'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-900">€{order.price}</TableCell>
-                    <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="text-blue-600 hover:text-blue-900"
-                          onClick={() => handleEditOrder(order)}
-                          data-testid={`button-edit-order-${order.id}`}
-                        >
-                          <i className="fas fa-edit mr-1"></i>Bearbeiten
-                        </Button>
-                        {(order.status === 'in_progress' || order.status === 'completed') && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="text-green-600 hover:text-green-900"
-                            onClick={() => {
-                              setSelectedOrderForHandover(order);
-                              setShowHandoverModal(true);
-                            }}
-                            data-testid={`button-view-handover-${order.id}`}
-                          >
-                            <i className="fas fa-clipboard-check mr-1"></i>Übergabe
-                          </Button>
-                        )}
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="text-red-600 hover:text-red-900"
-                          onClick={() => deleteOrderMutation.mutate(order.id)}
-                          disabled={deleteOrderMutation.isPending}
-                          data-testid={`button-delete-order-${order.id}`}
-                        >
-                          <i className="fas fa-trash mr-1"></i>Löschen
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                      </p>
+                    </div>
+                  </div>
+                  {getStatusBadge(order.status)}
+                </div>
+                
+                <div className="space-y-3 mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Route:</span>
+                    <span className="text-gray-900 text-right font-medium">
+                      {order.pickupLocation} → {order.deliveryLocation}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Entfernung:</span>
+                    <span className="text-gray-900">{order.distance} km</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Fahrzeug:</span>
+                    <span className="text-gray-900">
+                      {order.vehicleBrand} {order.vehicleModel}
+                      {order.vehicleYear && ` (${order.vehicleYear})`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Fahrer:</span>
+                    <span className="text-gray-900">
+                      {order.assignedDriverId ? 'Zugewiesen' : 'Nicht zugewiesen'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Preis:</span>
+                    <span className="text-lg font-bold text-primary-600">€{order.price}</span>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-900"
+                    onClick={() => handleEditOrder(order)}
+                    data-testid={`button-edit-order-${order.id}`}
+                  >
+                    <i className="fas fa-edit mr-1"></i>Bearbeiten
+                  </Button>
+                  {(order.status === 'in_progress' || order.status === 'completed') && (
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      className="text-green-600 hover:text-green-900"
+                      onClick={() => {
+                        setSelectedOrderForHandover(order);
+                        setShowHandoverModal(true);
+                      }}
+                      data-testid={`button-view-handover-${order.id}`}
+                    >
+                      <i className="fas fa-clipboard-check mr-1"></i>Übergabe
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 hover:text-red-900"
+                    onClick={() => deleteOrderMutation.mutate(order.id)}
+                    disabled={deleteOrderMutation.isPending}
+                    data-testid={`button-delete-order-${order.id}`}
+                  >
+                    <i className="fas fa-trash mr-1"></i>Löschen
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   );
 
