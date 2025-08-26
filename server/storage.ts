@@ -74,6 +74,10 @@ export interface IStorage {
   getBillingsByUser(userId: string): Promise<any[]>;
   getAllBillings(): Promise<any[]>;
   
+  // Vehicle Handover operations
+  createHandover(handover: InsertVehicleHandover): Promise<VehicleHandover>;
+  getHandoversByOrder(orderId: string): Promise<VehicleHandover[]>;
+  
   // Vehicle handover operations
   createVehicleHandover(handover: InsertVehicleHandover): Promise<VehicleHandover>;
   getHandoversByOrder(orderId: string): Promise<VehicleHandover[]>;
@@ -527,7 +531,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Vehicle handover operations
-  async createVehicleHandover(handover: InsertVehicleHandover): Promise<VehicleHandover> {
+  async createHandover(handover: InsertVehicleHandover): Promise<VehicleHandover> {
     const [newHandover] = await db
       .insert(vehicleHandovers)
       .values(handover)

@@ -95,8 +95,8 @@ export function HandoverFormModal({ isOpen, onClose, order, mode }: HandoverForm
   if (!order) return null;
 
   const isPickup = mode === 'pickup';
-  const title = isPickup ? "Fahrzeug-Abholung protokollieren" : "Fahrzeug-Abgabe protokollieren";
-  const locationLabel = isPickup ? "Abholort" : "Abgabeort";
+  const title = isPickup ? "Fahrzeug übernehmen" : "Fahrzeug abgeben";
+  const locationLabel = isPickup ? "Übernahmeort (aktueller Standort)" : "Abgabeort";
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
