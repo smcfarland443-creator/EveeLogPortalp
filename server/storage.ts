@@ -539,6 +539,11 @@ export class DatabaseStorage implements IStorage {
     return newHandover;
   }
 
+  // Alias method to match interface requirement
+  async createVehicleHandover(handover: InsertVehicleHandover): Promise<VehicleHandover> {
+    return this.createHandover(handover);
+  }
+
   async getHandoversByOrder(orderId: string): Promise<VehicleHandover[]> {
     return await db
       .select()
