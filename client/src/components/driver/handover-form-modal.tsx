@@ -39,7 +39,7 @@ export function HandoverFormModal({ isOpen, onClose, order, mode }: HandoverForm
     defaultValues: {
       kmReading: 0,
       fuelLevel: "",
-      location: "",
+      location: mode === 'pickup' ? order?.pickupLocation || "" : order?.deliveryLocation || "",
       vehicleCondition: "",
       damageNotes: "",
     },
@@ -174,11 +174,14 @@ export function HandoverFormModal({ isOpen, onClose, order, mode }: HandoverForm
                   <FormLabel>{locationLabel}</FormLabel>
                   <FormControl>
                     <Input 
-                      placeholder="Genaue Adresse oder Standort" 
-                      {...field} 
+                      placeholder="Wird automatisch ausgefüllt" 
+                      {...field}
+                      readOnly
+                      className="bg-gray-50" 
                       data-testid="input-location"
                     />
                   </FormControl>
+                  <p className="text-sm text-gray-600">Der Ort wird automatisch aus dem Auftrag übernommen</p>
                   <FormMessage />
                 </FormItem>
               )}
