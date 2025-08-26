@@ -387,6 +387,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update auction (full edit for admins and disponenten)
+  app.put('/api/auctions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      if (currentUser?.role !== 'admin' && currentUser?.role !== 'disponent') {
+        return res.status(403).json({ message: "Access denied. Only admins and disponenten can edit auctions." });
+      }
+
+      // Prepare data with correct date conversion
+      const auctionInput = {
+        ...req.body,
+        pickupDate: req.body.pickupDate ? new Date(req.body.pickupDate) : undefined,
+        deliveryDate: req.body.deliveryDate ? new Date(req.body.deliveryDate) : undefined,
+      };
+
+      // Remove any undefined deliveryDate
+      if (!auctionInput.deliveryDate) {
+        delete auctionInput.deliveryDate;
+      }
+
+      const auction = await storage.updateAuction(req.params.id, auctionInput);
+      if (!auction) {
+        return res.status(404).json({ message: "Auction not found" });
+      }
+      
+      res.json(auction);
+    } catch (error) {
+      console.error("Error updating auction:", error);
+      res.status(500).json({ message: "Failed to update auction" });
+    }
+  });
+
   app.patch('/api/auctions/:id/status', isAuthenticated, async (req: any, res) => {
     try {
       const currentUser = await storage.getUser(req.user.claims.sub);

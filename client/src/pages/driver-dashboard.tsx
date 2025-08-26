@@ -60,21 +60,22 @@ export default function DriverDashboard() {
   // Type assertions for data
   const typedOrders = orders as Order[];
   const typedAuctions = auctions as Auction[];
+  const typedBillings = billings as any[];
 
   // Mutations
-  const markCompletedMutation = useMutation({
+  const markDeliveredMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      await apiRequest("PATCH", `/api/orders/${orderId}/status`, { status: 'completed' });
+      await apiRequest("PATCH", `/api/orders/${orderId}/status`, { status: 'delivered' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({ title: "Success", description: "Order marked as completed" });
+      toast({ title: "Erfolg", description: "Auto wurde erfolgreich abgegeben" });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          title: "Nicht autorisiert",
+          description: "Sie sind nicht angemeldet. Weiterleitung zur Anmeldung...",
           variant: "destructive",
         });
         setTimeout(() => {
@@ -82,7 +83,7 @@ export default function DriverDashboard() {
         }, 500);
         return;
       }
-      toast({ title: "Error", description: "Failed to update order", variant: "destructive" });
+      toast({ title: "Fehler", description: "Fehler beim Aktualisieren des Auftrags", variant: "destructive" });
     },
   });
 
@@ -169,7 +170,7 @@ export default function DriverDashboard() {
 
   const assignedOrders = typedOrders.filter((order: Order) => 
     (order.status === 'assigned' && order.fromAuction !== 'true') || // Manual assignments that need acceptance
-    order.status === 'in_progress'
+    order.status === 'in_progress' || order.status === 'delivered'
   );
   const completedOrders = typedOrders.filter((order: Order) => order.status === 'completed');
   const monthlyEarnings = completedOrders.reduce((sum: number, order: Order) => sum + Number(order.price), 0);
@@ -183,7 +184,8 @@ export default function DriverDashboard() {
   const getStatusBadge = (status: string) => {
     const statusMap = {
       assigned: { label: "Zugewiesen", variant: "default" as const },
-      in_progress: { label: "In Bearbeitung", variant: "secondary" as const },
+      in_progress: { label: "Auto abgeholt", variant: "secondary" as const },
+      delivered: { label: "Auto abgegeben", variant: "outline" as const },
       completed: { label: "Abgeschlossen", variant: "secondary" as const },
       cancelled: { label: "Storniert", variant: "destructive" as const },
       open: { label: "Offen", variant: "outline" as const },
@@ -319,12 +321,17 @@ export default function DriverDashboard() {
                       <Button
                         size="sm"
                         className="bg-blue-500 hover:bg-blue-600 text-white"
-                        onClick={() => markCompletedMutation.mutate(order.id)}
-                        disabled={markCompletedMutation.isPending}
-                        data-testid={`button-mark-completed-${order.id}`}
+                        onClick={() => markDeliveredMutation.mutate(order.id)}
+                        disabled={markDeliveredMutation.isPending}
+                        data-testid={`button-mark-delivered-${order.id}`}
                       >
-                        Als erledigt markieren
+                        Auto abgegeben
                       </Button>
+                    )}
+                    {order.status === 'delivered' && (
+                      <div className="text-green-600 text-sm font-medium">
+                        ✓ Auto wurde abgegeben - Wartet auf admin. Bestätigung
+                      </div>
                     )}
                     {order.status === 'in_progress' && (
                       <Button
@@ -532,12 +539,12 @@ export default function DriverDashboard() {
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
           </div>
-        ) : billings.length === 0 ? (
+        ) : typedBillings.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             Keine Abrechnungen vorhanden
           </div>
         ) : (
-          billings.map((billing: any) => (
+          typedBillings.map((billing: any) => (
             <Card key={billing.id}>
               <CardContent className="pt-6">
                 <div className="flex justify-between items-start mb-4">

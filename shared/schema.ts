@@ -33,7 +33,7 @@ export const userRoleEnum = pgEnum('user_role', ['admin', 'driver', 'disponent']
 export const userStatusEnum = pgEnum('user_status', ['pending', 'active', 'inactive']);
 
 // Order status enum
-export const orderStatusEnum = pgEnum('order_status', ['open', 'assigned', 'in_progress', 'completed', 'cancelled']);
+export const orderStatusEnum = pgEnum('order_status', ['open', 'assigned', 'in_progress', 'delivered', 'completed', 'cancelled']);
 
 // Auction status enum
 export const auctionStatusEnum = pgEnum('auction_status', ['active', 'sold', 'cancelled']);

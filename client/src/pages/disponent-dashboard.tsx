@@ -16,10 +16,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Truck, MapPin, Calendar, Euro } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertOrderSchema, type Order } from "@shared/schema";
+import { insertOrderSchema, type Order, type Auction } from "@shared/schema";
+import { AuctionFormModal } from "@/components/admin/auction-form-modal";
+import { AuctionEditModal } from "@/components/admin/auction-edit-modal";
 import { z } from "zod";
 
-type ViewType = 'dashboard' | 'orders' | 'create';
+type ViewType = 'dashboard' | 'orders' | 'auctions' | 'create';
 
 // Form schema for creating orders
 const disponentOrderSchema = insertOrderSchema.extend({
@@ -32,6 +34,9 @@ type DisponentOrderFormData = z.infer<typeof disponentOrderSchema>;
 export default function DisponentDashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
+  const [showAuctionModal, setShowAuctionModal] = useState(false);
+  const [showAuctionEditModal, setShowAuctionEditModal] = useState(false);
+  const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
 
@@ -50,13 +55,19 @@ export default function DisponentDashboard() {
     }
   }, [user, authLoading, toast]);
 
-  // Fetch only disponent's own orders
+  // Fetch data
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["/api/orders"],
     enabled: !!user && (user as any)?.role === 'disponent',
   });
 
+  const { data: auctions = [], isLoading: auctionsLoading } = useQuery({
+    queryKey: ["/api/auctions"],
+    enabled: !!user && (user as any)?.role === 'disponent',
+  });
+
   const typedOrders = orders as Order[];
+  const typedAuctions = auctions as Auction[];
 
   // Create order mutation
   const createOrderMutation = useMutation({

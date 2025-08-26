@@ -54,7 +54,7 @@ export interface IStorage {
   getOrdersByDriver(driverId: string): Promise<Order[]>;
   getOrdersByCreator(creatorId: string): Promise<Order[]>;
   getOrderById(id: string): Promise<Order | undefined>;
-  updateOrderStatus(id: string, status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled'): Promise<Order | undefined>;
+  updateOrderStatus(id: string, status: 'open' | 'assigned' | 'in_progress' | 'delivered' | 'completed' | 'cancelled'): Promise<Order | undefined>;
   assignOrderToDriver(orderId: string, driverId: string): Promise<Order | undefined>;
   deleteOrder(id: string): Promise<boolean>;
   acceptOrder(orderId: string, driverId: string): Promise<Order | undefined>;
@@ -66,6 +66,7 @@ export interface IStorage {
   getAuctionById(id: string): Promise<Auction | undefined>;
   purchaseAuction(auctionId: string, buyerId: string): Promise<{ auction: Auction; order: Order } | undefined>;
   updateAuctionStatus(id: string, status: 'active' | 'sold' | 'cancelled'): Promise<Auction | undefined>;
+  updateAuction(id: string, auctionData: Partial<InsertAuction>): Promise<Auction | undefined>;
   deleteAuction(id: string): Promise<boolean>;
   
   // Billing operations
@@ -181,12 +182,18 @@ export class DatabaseStorage implements IStorage {
 
   // Order operations
   async createOrder(order: InsertOrder): Promise<Order> {
-    const [newOrder] = await db.insert(orders).values(order).returning();
+    // Ensure dates are Date objects, not strings
+    const orderData = {
+      ...order,
+      pickupDate: typeof order.pickupDate === 'string' ? new Date(order.pickupDate) : order.pickupDate,
+      deliveryDate: order.deliveryDate ? (typeof order.deliveryDate === 'string' ? new Date(order.deliveryDate) : order.deliveryDate) : undefined
+    };
+    const [newOrder] = await db.insert(orders).values([orderData]).returning();
     return newOrder;
   }
 
-  async updateOrder(id: string, orderData: Partial<Order>): Promise<Order | undefined> {
-    const updateData = { ...orderData, updatedAt: new Date() };
+  async updateOrder(id: string, orderData: Partial<InsertOrder>): Promise<Order | undefined> {
+    const updateData: any = { ...orderData, updatedAt: new Date() };
     // Ensure dates are Date objects, not strings
     if (updateData.deliveryDate && typeof updateData.deliveryDate === 'string') {
       updateData.deliveryDate = new Date(updateData.deliveryDate);
@@ -294,7 +301,13 @@ export class DatabaseStorage implements IStorage {
 
   // Auction operations
   async createAuction(auction: InsertAuction): Promise<Auction> {
-    const [newAuction] = await db.insert(auctions).values(auction).returning();
+    // Ensure dates are Date objects, not strings
+    const auctionData = {
+      ...auction,
+      pickupDate: typeof auction.pickupDate === 'string' ? new Date(auction.pickupDate) : auction.pickupDate,
+      deliveryDate: auction.deliveryDate ? (typeof auction.deliveryDate === 'string' ? new Date(auction.deliveryDate) : auction.deliveryDate) : undefined
+    };
+    const [newAuction] = await db.insert(auctions).values([auctionData]).returning();
     return newAuction;
   }
 
@@ -383,6 +396,24 @@ export class DatabaseStorage implements IStorage {
     const [auction] = await db
       .update(auctions)
       .set({ status, updatedAt: new Date() })
+      .where(eq(auctions.id, id))
+      .returning();
+    return auction;
+  }
+
+  async updateAuction(id: string, auctionData: Partial<InsertAuction>): Promise<Auction | undefined> {
+    const updateData: any = { ...auctionData, updatedAt: new Date() };
+    // Ensure dates are Date objects, not strings
+    if (updateData.deliveryDate && typeof updateData.deliveryDate === 'string') {
+      updateData.deliveryDate = new Date(updateData.deliveryDate);
+    }
+    if (updateData.pickupDate && typeof updateData.pickupDate === 'string') {
+      updateData.pickupDate = new Date(updateData.pickupDate);
+    }
+    
+    const [auction] = await db
+      .update(auctions)
+      .set(updateData)
       .where(eq(auctions.id, id))
       .returning();
     return auction;

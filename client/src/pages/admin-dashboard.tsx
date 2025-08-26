@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { OrderFormModal } from "@/components/admin/order-form-modal";
 import { OrderEditModal } from "@/components/admin/order-edit-modal";
 import { AuctionFormModal } from "@/components/admin/auction-form-modal";
+import { AuctionEditModal } from "@/components/admin/auction-edit-modal";
 import { UserFormModal } from "@/components/admin/user-form-modal";
 import { HandoverDetailsModal } from "@/components/admin/handover-details-modal";
 import AdminBilling from "@/pages/admin-billing";
@@ -45,6 +46,8 @@ export default function AdminDashboard() {
   const [showOrderEditModal, setShowOrderEditModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [showAuctionModal, setShowAuctionModal] = useState(false);
+  const [showAuctionEditModal, setShowAuctionEditModal] = useState(false);
+  const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -603,6 +606,18 @@ export default function AdminDashboard() {
                   <Button 
                     variant="outline"
                     size="sm"
+                    className="text-blue-600 hover:text-blue-900"
+                    onClick={() => {
+                      setEditingAuction(auction);
+                      setShowAuctionEditModal(true);
+                    }}
+                    data-testid={`button-edit-auction-${auction.id}`}
+                  >
+                    <i className="fas fa-edit mr-1"></i>Bearbeiten
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    size="sm"
                     className="text-red-600 hover:text-red-900"
                     onClick={() => deleteAuctionMutation.mutate(auction.id)}
                     disabled={deleteAuctionMutation.isPending}
@@ -816,6 +831,15 @@ export default function AdminDashboard() {
       <AuctionFormModal 
         isOpen={showAuctionModal} 
         onClose={() => setShowAuctionModal(false)} 
+      />
+      
+      <AuctionEditModal 
+        isOpen={showAuctionEditModal} 
+        onClose={() => {
+          setShowAuctionEditModal(false);
+          setEditingAuction(null);
+        }}
+        auction={editingAuction}
       />
       
       <UserFormModal 
