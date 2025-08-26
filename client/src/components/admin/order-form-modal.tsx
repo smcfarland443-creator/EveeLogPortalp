@@ -284,7 +284,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                     <FormLabel>Abholtermin</FormLabel>
                     <FormControl>
                       <Input 
-                        type="date" 
+                        type="datetime-local" 
                         {...field} 
                         data-testid="input-pickup-date"
                       />
@@ -302,7 +302,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormModalProps) {
                     <FormLabel>Liefertermin</FormLabel>
                     <FormControl>
                       <Input 
-                        type="date" 
+                        type="datetime-local" 
                         {...field}
                         value={field.value || ""}
                         data-testid="input-delivery-date"

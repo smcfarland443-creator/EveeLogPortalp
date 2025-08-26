@@ -27,7 +27,7 @@ export async function calculateDistance(
       params: {
         origins: [origin],
         destinations: [destination],
-        units: 'metric',
+        units: "metric" as const,
         key: apiKey,
       },
     });
