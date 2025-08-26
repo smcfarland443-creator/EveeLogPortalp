@@ -182,6 +182,21 @@ export const vehicleHandovers = pgTable("vehicle_handovers", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Auction bids (for competitive bidding)
+export const auctionBids = pgTable("auction_bids", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  auctionId: varchar("auction_id").notNull().references(() => auctions.id),
+  driverId: varchar("driver_id").notNull().references(() => users.id),
+  bidAmount: decimal("bid_amount", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"), // Optional driver comment
+  status: varchar("status").notNull().default('pending'), // 'pending', 'accepted', 'rejected'
+  acceptedAt: timestamp("accepted_at"),
+  acceptedBy: varchar("accepted_by").references(() => users.id),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Order approval requests (for assignments and auction confirmations)
 export const orderApprovals = pgTable("order_approvals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -232,6 +247,24 @@ export const vehicleHandoversRelations = relations(vehicleHandovers, ({ one }) =
   driver: one(users, {
     fields: [vehicleHandovers.driverId],
     references: [users.id],
+  }),
+}));
+
+// Relations for auction bids
+export const auctionBidsRelations = relations(auctionBids, ({ one }) => ({
+  auction: one(auctions, {
+    fields: [auctionBids.auctionId],
+    references: [auctions.id],
+  }),
+  driver: one(users, {
+    fields: [auctionBids.driverId],
+    references: [users.id],
+    relationName: "bidsByDriver",
+  }),
+  acceptedBy: one(users, {
+    fields: [auctionBids.acceptedBy],
+    references: [users.id],
+    relationName: "bidsAcceptedBy",
   }),
 }));
 
@@ -317,6 +350,16 @@ export const insertOrderApprovalSchema = createInsertSchema(orderApprovals).omit
   respondedAt: true,
 });
 
+export const insertAuctionBidSchema = createInsertSchema(auctionBids).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+  acceptedAt: true,
+  acceptedBy: true,
+  adminNotes: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -331,3 +374,8 @@ export type VehicleHandover = typeof vehicleHandovers.$inferSelect;
 export type InsertVehicleHandover = z.infer<typeof insertVehicleHandoverSchema>;
 export type OrderApproval = typeof orderApprovals.$inferSelect;
 export type InsertOrderApproval = z.infer<typeof insertOrderApprovalSchema>;
+export type AuctionBid = typeof auctionBids.$inferSelect;
+export type InsertAuctionBid = z.infer<typeof insertAuctionBidSchema>;
+export type AuctionBidWithDriver = AuctionBid & {
+  driver: User;
+};
