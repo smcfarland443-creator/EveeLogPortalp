@@ -60,7 +60,7 @@ export function VehicleHandoverDialog({ isOpen, onClose, order, mode }: VehicleH
     mutationFn: async (data: HandoverFormData & { photos?: File[] }) => {
       // For now, we'll submit without photos until we implement file upload endpoint
       const { photos: _, ...submitData } = data;
-      return await apiRequest(`/api/orders/${order?.id}/handover`, "POST", {
+      return await apiRequest("POST", `/api/orders/${order?.id}/handover`, {
         ...submitData,
         type: mode,
       });

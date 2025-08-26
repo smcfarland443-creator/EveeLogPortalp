@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import eveelogLogo from "@assets/eveelogBLACK_1756238052052.png";
 
 const loginSchema = z.object({
   email: z.string().email("Gültige E-Mail-Adresse erforderlich"),
@@ -67,8 +68,15 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
+          <div className="mb-4">
+            <img 
+              src={eveelogLogo} 
+              alt="Eveelog Logo" 
+              className="h-16 w-auto mx-auto mb-4"
+            />
+          </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
-            AutoTransfer Pro
+            Eveelog Portal
           </CardTitle>
           <p className="text-gray-600">Anmelden um fortzufahren</p>
         </CardHeader>

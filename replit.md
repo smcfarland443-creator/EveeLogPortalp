@@ -1,8 +1,8 @@
-# AutoTransfer Pro
+# Eveelog Portal
 
 ## Overview
 
-AutoTransfer Pro is a vehicle transportation platform built for managing vehicle delivery orders and auctions. The system provides role-based access with separate dashboards for administrators and drivers. Administrators can create and manage orders and auctions, while drivers can view available opportunities and purchase instant-buy auctions.
+Eveelog Portal is a vehicle transportation platform built for managing vehicle delivery orders and auctions. The system provides role-based access with separate dashboards for administrators and drivers. Administrators can create and manage orders and auctions, while drivers can view available opportunities and purchase instant-buy auctions.
 
 The application is built as a full-stack TypeScript solution with a React frontend and Express.js backend, featuring modern UI components, real-time data management, and secure authentication through Replit's OAuth system.
 

@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import eveelogLogo from "@assets/eveelogBLACK_1756238052052.png";
 
 export default function Landing() {
   const handleLogin = () => {
@@ -10,12 +11,16 @@ export default function Landing() {
     <div className="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-primary-500 rounded-xl flex items-center justify-center mb-6">
-            <i className="fas fa-car text-white text-2xl"></i>
+          <div className="mx-auto h-20 w-auto mb-6">
+            <img 
+              src={eveelogLogo} 
+              alt="Eveelog Logo" 
+              className="h-20 w-auto mx-auto"
+            />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">AutoTransfer Pro</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Eveelog Portal</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Professionelle Fahrzeugüberführungsplattform
+            Professionelle Fahrzeuglogistik & Transport
           </p>
         </div>
         
@@ -24,7 +29,7 @@ export default function Landing() {
             <div className="space-y-4">
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Willkommen bei AutoTransfer Pro
+                  Willkommen bei Eveelog Portal
                 </h3>
                 <p className="text-sm text-gray-600 mb-6">
                   Melden Sie sich an, um auf Ihre Überführungsaufträge zuzugreifen.

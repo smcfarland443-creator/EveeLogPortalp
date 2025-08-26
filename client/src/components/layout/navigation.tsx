@@ -1,4 +1,5 @@
 import type { User } from "@shared/schema";
+import eveelogLogo from "@assets/eveelogBLACK_1756238052052.png";
 
 interface NavigationProps {
   user: User;
@@ -17,10 +18,12 @@ export function Navigation({ user, currentView, onViewChange, userType }: Naviga
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <div className="h-10 w-10 bg-primary-500 rounded-lg flex items-center justify-center">
-              <i className="fas fa-car text-white"></i>
-            </div>
-            <span className="ml-3 text-xl font-bold text-gray-900">AutoTransfer Pro</span>
+            <img 
+              src={eveelogLogo} 
+              alt="Eveelog Logo" 
+              className="h-12 w-auto"
+            />
+            <span className="ml-3 text-xl font-bold text-gray-900">Eveelog Portal</span>
           </div>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">

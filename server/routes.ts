@@ -599,7 +599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newStatus = 'completed';
       }
       
-      const updatedOrder = await storage.updateOrderStatus(orderId, newStatus);
+      const updatedOrder = await storage.updateOrderAfterHandover(orderId, handoverType);
 
       res.json({ handover, order: updatedOrder });
     } catch (error) {
