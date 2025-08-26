@@ -310,17 +310,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
+      // Validate that the order exists and the driver is assigned to it
+      const order = await storage.getOrderById(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.assignedDriverId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Not authorized for this order" });
+      }
+
+      // Transform the data to match the database schema
       const handoverData = {
-        ...req.body,
         orderId: req.params.id,
         driverId: req.user.claims.sub,
+        handoverType: req.body.handoverType,
+        kmReading: req.body.kmReading,
+        fuelLevel: req.body.fuelLevel,
+        vehicleCondition: req.body.vehicleCondition,
+        damageNotes: req.body.damageNotes,
+        photos: [], // Empty array for now (photo upload not implemented yet)
+        signature: null, // Not implemented yet
+        location: req.body.location,
+        handoverDateTime: req.body.handoverDateTime ? new Date(req.body.handoverDateTime) : new Date(),
       };
       
+      console.log("Creating handover with data:", handoverData);
+      
       const handover = await storage.createHandover(handoverData);
+      
+      // Also update the order status based on handover type
+      if (req.body.handoverType === 'pickup') {
+        await storage.updateOrderStatus(req.params.id, 'in_progress');
+      } else if (req.body.handoverType === 'delivery') {
+        await storage.updateOrderStatus(req.params.id, 'completed');
+      }
+      
       res.json(handover);
     } catch (error) {
       console.error("Error creating handover:", error);
-      res.status(500).json({ message: "Failed to create handover protocol" });
+      console.error("Request body:", req.body);
+      console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ 
+        message: "Failed to create handover protocol",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

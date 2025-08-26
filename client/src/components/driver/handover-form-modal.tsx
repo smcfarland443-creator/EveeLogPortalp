@@ -63,15 +63,8 @@ export function HandoverFormModal({ isOpen, onClose, order, mode }: HandoverForm
         handoverDateTime: new Date().toISOString(),
       };
       
-      // Erstelle Handover-Protokoll
+      // Erstelle Handover-Protokoll (status wird automatisch aktualisiert)
       await apiRequest("POST", `/api/orders/${order.id}/handovers`, handoverData);
-      
-      // Update Order Status
-      if (mode === 'pickup') {
-        await apiRequest("PATCH", `/api/orders/${order.id}/status`, { status: 'in_progress' });
-      } else if (mode === 'delivery') {
-        await apiRequest("PATCH", `/api/orders/${order.id}/status`, { status: 'delivered' });
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -82,10 +75,12 @@ export function HandoverFormModal({ isOpen, onClose, order, mode }: HandoverForm
       onClose();
       form.reset();
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error("Handover submission error:", error);
+      const errorMessage = error?.response?.data?.error || error?.message || "Fehler beim Speichern des Protokolls";
       toast({ 
         title: "Fehler", 
-        description: "Fehler beim Speichern des Protokolls", 
+        description: errorMessage, 
         variant: "destructive" 
       });
     },
