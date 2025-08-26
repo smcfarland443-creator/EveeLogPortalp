@@ -475,13 +475,10 @@ export default function DriverDashboard() {
                   
                   {order.status === 'in_progress' && (
                     <Button 
-                      onClick={() => {
-                        setSelectedOrder(order);
-                        setHandoverMode('delivery');
-                        setIsHandoverDialogOpen(true);
-                      }}
+                      onClick={() => updateOrderStatus.mutate({ orderId: order.id, status: 'delivered' })}
                       size="sm"
                       className="bg-green-600 hover:bg-green-700"
+                      disabled={updateOrderStatus.isPending}
                       data-testid={`button-delivery-${order.id}`}
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />

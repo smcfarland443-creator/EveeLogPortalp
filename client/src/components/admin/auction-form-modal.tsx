@@ -241,6 +241,84 @@ export function AuctionFormModal({ isOpen, onClose }: AuctionFormModalProps) {
               />
             </div>
 
+            {/* Zeit-Felder für Abholung */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="pickupTimeFrom"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Abholzeit von</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="time" 
+                        {...field}
+                        data-testid="input-pickup-time-from"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="pickupTimeTo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Abholzeit bis</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="time" 
+                        {...field}
+                        data-testid="input-pickup-time-to"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Zeit-Felder für Lieferung */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="deliveryTimeFrom"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lieferzeit von</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="time" 
+                        {...field}
+                        data-testid="input-delivery-time-from"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="deliveryTimeTo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lieferzeit bis</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="time" 
+                        {...field}
+                        data-testid="input-delivery-time-to"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
